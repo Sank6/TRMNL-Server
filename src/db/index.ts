@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   method      TEXT NOT NULL,
   path        TEXT NOT NULL,
+  ip          TEXT,
   headers     TEXT NOT NULL DEFAULT '{}',
   body        TEXT,
   status_code INTEGER,
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
   duration_ms INTEGER,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
 
 CREATE TABLE IF NOT EXISTS device_logs (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,5 +43,7 @@ CREATE TABLE IF NOT EXISTS device_logs (
 export function openDatabase(path: string): AppDB {
   const db = new Database(path);
   db.exec(MIGRATIONS);
+  // Additive migration: ip column added after initial release
+  try { db.exec("ALTER TABLE request_logs ADD COLUMN ip TEXT;"); } catch { /* already exists */ }
   return db;
 }

@@ -5,6 +5,7 @@ export function insertRequestLog(
   entry: {
     method: string;
     path: string;
+    ip: string | null;
     headers: Record<string, string | string[] | undefined>;
     body: unknown;
     status_code: number;
@@ -13,11 +14,12 @@ export function insertRequestLog(
   }
 ): void {
   db.prepare(`
-    INSERT INTO request_logs (method, path, headers, body, status_code, response, duration_ms)
-    VALUES (@method, @path, @headers, @body, @status_code, @response, @duration_ms)
+    INSERT INTO request_logs (method, path, ip, headers, body, status_code, response, duration_ms)
+    VALUES (@method, @path, @ip, @headers, @body, @status_code, @response, @duration_ms)
   `).run({
     method: entry.method,
     path: entry.path,
+    ip: entry.ip,
     headers: JSON.stringify(entry.headers),
     body: entry.body != null ? JSON.stringify(entry.body) : null,
     status_code: entry.status_code,

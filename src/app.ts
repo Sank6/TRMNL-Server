@@ -13,7 +13,18 @@ export async function buildApp(config: Config, db: AppDB) {
     logger:
       config.logLevel === "silent"
         ? false
-        : { level: config.logLevel },
+        : {
+            level: config.logLevel,
+            transport: {
+              target: "pino-pretty",
+              options: {
+                colorize: true,
+                translateTime: "HH:MM:ss",
+                ignore: "pid,hostname",
+                messageFormat: "{msg}",
+              },
+            },
+          },
   });
 
   // ------------------------------------------------------------------

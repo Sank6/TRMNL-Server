@@ -48,6 +48,7 @@ const requestLoggerPlugin: FastifyPluginAsync<{ db: AppDB }> = async (
         insertRequestLog(db, {
           method: request.method,
           path: request.url.split("?")[0],
+          ip: request.ip ?? null,
           headers: request.headers as Record<string, string | string[] | undefined>,
           body: request._rawBody ?? null,
           status_code: reply.statusCode,

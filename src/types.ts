@@ -14,6 +14,7 @@ export interface RequestLog {
   id: number;
   method: string;
   path: string;
+  ip: string | null;
   headers: string;
   body: string | null;
   status_code: number | null;

@@ -10,7 +10,11 @@
       "Bash(git -C /c/Users/Sankarsh/Documents/xteink-server log --oneline -5)",
       "Bash(npm --version)",
       "Bash(npx --yes tsx --version)",
-      "Bash(npm info:*)"
+      "Bash(npm info:*)",
+      "Bash(bun run:*)",
+      "Bash(bun -e \":*)",
+      "Bash(sqlite3 ./data/xteink.db \"SELECT created_at, method, path, status_code, substr\\(headers,1,300\\), substr\\(response,1,300\\) FROM request_logs WHERE headers LIKE ''%192.168.1.134%'' ORDER BY created_at DESC LIMIT 20;\")",
+      "Bash(where sqlite3:*)"
     ]
   }
 }
