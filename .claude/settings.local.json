@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(find /c/Users/Sankarsh/Documents/xteink-server -not -path */.git/* -not -path */.claude/*)",
+      "WebFetch(domain:docs.trmnl.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git -C /c/Users/Sankarsh/Documents/xteink-server log --oneline -5)",
+      "Bash(npm --version)",
+      "Bash(npx --yes tsx --version)",
+      "Bash(npm info:*)"
+    ]
+  }
+}
