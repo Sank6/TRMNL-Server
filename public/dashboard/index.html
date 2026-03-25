@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xteink dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    background: #0e0e10;
+    color: #e4e4e7;
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  header {
+    background: #18181b;
+    color: #fff;
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #27272a;
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  header .sep { color: #52525b; }
+  header .sub { color: #71717a; font-size: 16px; }
+
+  nav {
+    background: #18181b;
+    border-bottom: 1px solid #27272a;
+    padding: 0 28px;
+    display: flex;
+    gap: 2px;
+  }
+  nav button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 14px 18px 12px;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    color: #71717a;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  nav button:hover { color: #e4e4e7; }
+  nav button.active { color: #fff; border-bottom-color: #a1a1aa; }
+
+  main { padding: 24px 28px; max-width: 1440px; }
+
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* ── WIDGETS ─────────────────────────────────────────────────── */
+  .widget-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 1100px) { .widget-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px)  { .widget-grid { grid-template-columns: 1fr; } }
+
+  .widget-card {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .widget-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .widget-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .widget-card img {
+    width: 100%;
+    border-radius: 4px;
+    border: 1px solid #27272a;
+    display: block;
+    background: #09090b;
+  }
+  .widget-meta {
+    margin-top: 10px;
+    color: #71717a;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .btn {
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn:hover { background: #3f3f46; border-color: #52525b; }
+  .btn:disabled { background: #18181b; color: #52525b; border-color: #27272a; cursor: not-allowed; }
+  .btn-sm { padding: 5px 13px; font-size: 14px; }
+
+  /* ── FILTER BAR ─────────────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .filter-bar input,
+  .filter-bar select {
+    font-family: inherit;
+    font-size: 15px;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 7px 12px;
+    background: #18181b;
+    color: #e4e4e7;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-bar input::placeholder { color: #52525b; }
+  .filter-bar select option { background: #18181b; }
+  .filter-bar input:focus,
+  .filter-bar select:focus { border-color: #71717a; }
+
+  .refresh-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    color: #71717a;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+  .refresh-label input { width: 15px; height: 15px; cursor: pointer; accent-color: #a1a1aa; }
+
+  /* ── TABLE ──────────────────────────────────────────────────── */
+  .table-wrap {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #18181b;
+    border-bottom: 1px solid #27272a;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #52525b;
+    white-space: nowrap;
+  }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: #1c1c1f; }
+  tbody tr + tr td { border-top: 1px solid #27272a; }
+  tbody td {
+    padding: 11px 16px;
+    font-size: 15.5px;
+    vertical-align: middle;
+  }
+  .cell-mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 14px; }
+  .cell-dim { color: #71717a; }
+  .truncate { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #27272a;
+    color: #a1a1aa;
+  }
+  .badge-get  { background: #1e3a5f; color: #60a5fa; }
+  .badge-post { background: #14532d; color: #4ade80; }
+  .badge-put  { background: #451a03; color: #fb923c; }
+  .badge-del  { background: #450a0a; color: #f87171; }
+
+  .status-ok   { color: #4ade80; font-weight: 600; }
+  .status-err  { color: #f87171; font-weight: 600; }
+  .status-warn { color: #fb923c; font-weight: 600; }
+
+  /* ── PAGINATION ─────────────────────────────────────────────── */
+  .pagination {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    align-items: center;
+    font-size: 15px;
+    color: #71717a;
+  }
+  .pagination button {
+    font-family: inherit;
+    font-size: 15px;
+    border: 1px solid #3f3f46;
+    background: #18181b;
+    border-radius: 6px;
+    padding: 5px 14px;
+    cursor: pointer;
+    color: #e4e4e7;
+    transition: background 0.15s;
+  }
+  .pagination button:hover:not(:disabled) { background: #27272a; }
+  .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .empty { color: #52525b; padding: 40px; text-align: center; font-size: 16px; }
+
+  /* ── MODAL ───────────────────────────────────────────────────── */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.65);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  #modal {
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 12px;
+    width: min(760px, 92vw);
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 22px;
+    border-bottom: 1px solid #27272a;
+    flex-shrink: 0;
+  }
+  #modal-title { font-size: 16px; font-weight: 600; color: #e4e4e7; }
+  #modal-close {
+    background: none; border: none; color: #71717a; font-size: 18px;
+    cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 4px;
+  }
+  #modal-close:hover { background: #27272a; color: #e4e4e7; }
+  #modal-body {
+    overflow-y: auto; padding: 20px 22px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .modal-field { display: flex; flex-direction: column; gap: 4px; }
+  .modal-field.full { grid-column: 1 / -1; }
+  .modal-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #52525b; }
+  .modal-value {
+    font-size: 14px; color: #e4e4e7; word-break: break-all;
+    background: #09090b; border: 1px solid #27272a; border-radius: 6px;
+    padding: 8px 10px; white-space: pre-wrap; min-height: 32px;
+  }
+  .modal-value.mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 13px; }
+
+  tbody tr { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>xteink</h1>
+  <span class="sep">/</span>
+  <span class="sub">dashboard</span>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('widgets')">Widgets</button>
+  <button onclick="showTab('logs')">Logs</button>
+  <button onclick="showTab('devices')">Devices</button>
+  <button onclick="showTab('device-logs')">Device Logs</button>
+</nav>
+
+<main>
+
+<!-- WIDGETS TAB -->
+<div id="tab-widgets" class="tab active">
+  <div class="widget-grid" id="widget-grid"><p class="empty">Loading…</p></div>
+</div>
+
+<!-- LOGS TAB -->
+<div id="tab-logs" class="tab">
+  <div class="filter-bar">
+    <select id="f-ip" style="width:170px">
+      <option value="">All IPs</option>
+    </select>
+    <input id="f-path" placeholder="Path" style="width:180px">
+    <select id="f-method" style="width:180px">
+      <option value="">All methods</option>
+      <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+    </select>
+    <input id="f-status" placeholder="Status" style="width:90px">
+    <input id="f-q" placeholder="Search…" style="width:180px">
+    <button class="btn btn-sm" onclick="loadLogs(0)">Filter</button>
+    <label class="refresh-label"><input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()"> Auto-refresh (5s)</label>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Time</th><th>IP</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th>
+      </tr></thead>
+      <tbody id="logs-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button id="logs-prev" onclick="logsPage(-1)" disabled>← Prev</button>
+    <span id="logs-info"></span>
+    <button id="logs-next" onclick="logsPage(1)" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- DEVICES TAB -->
+<div id="tab-devices" class="tab">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>MAC</th><th>Friendly ID</th><th>API Key</th><th>Model</th><th>FW</th><th>Last Seen</th><th>Widget #</th>
+      </tr></thead>
+      <tbody id="devices-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DEVICE LOGS TAB -->
+<div id="tab-device-logs" class="tab">
+  <div class="filter-bar">
+    <input id="f-dlmac" placeholder="Filter by MAC" style="width:180px">
+    <button class="btn btn-sm" onclick="loadDeviceLogs(0)">Filter</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Time</th><th>MAC</th><th>API Key</th><th>Payload</th>
+      </tr></thead>
+      <tbody id="device-logs-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button id="dlogs-prev" onclick="dlogsPage(-1)" disabled>← Prev</button>
+    <span id="dlogs-info"></span>
+    <button id="dlogs-next" onclick="dlogsPage(1)" disabled>Next →</button>
+  </div>
+</div>
+
+</main>
+
+<!-- REQUEST MODAL -->
+<div id="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title"></div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+let logsOffset = 0, logsTotal = 0;
+let dlogsOffset = 0, dlogsTotal = 0;
+const PAGE = 50;
+let autoRefreshTimer = null;
+let logsCache = [], devicesCache = [], dlogsCache = [];
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'widgets') loadWidgets();
+  else if (name === 'logs') { loadLogIPs(); loadLogs(0); }
+  else if (name === 'devices') loadDevices();
+  else if (name === 'device-logs') loadDeviceLogs(0);
+}
+
+// ── WIDGETS ──────────────────────────────────────────────────────────
+async function loadWidgets() {
+  const grid = document.getElementById('widget-grid');
+  try {
+    const data = await fetch('/api/widgets').then(r => r.json());
+    if (!data.length) { grid.innerHTML = '<p class="empty">No widgets found.</p>'; return; }
+    grid.innerHTML = data.map(w => `
+      <div class="widget-card" id="card-${w.name}">
+        <div class="widget-card-header">
+          <h3>${w.name}</h3>
+          <button class="btn btn-sm" onclick="regenerate('${w.name}', this)">Regenerate</button>
+        </div>
+        <img src="/api/widgets/${w.name}.png?t=${Date.now()}" alt="${w.name}">
+        <div class="widget-meta">
+          <span>${(w.size / 1024).toFixed(1)} KB</span>
+          <span>${fmtTime(w.mtime)}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch { grid.innerHTML = '<p class="empty">Failed to load widgets.</p>'; }
+}
+
+async function regenerate(name, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    await fetch('/api/regenerate/' + name, { method: 'POST' });
+    const card = document.getElementById('card-' + name);
+    card.querySelector('img').src = `/api/widgets/${name}.png?t=${Date.now()}`;
+    btn.textContent = 'Done';
+    setTimeout(() => { btn.textContent = 'Regenerate'; btn.disabled = false; }, 1500);
+  } catch {
+    btn.textContent = 'Error'; btn.disabled = false;
+  }
+}
+
+// ── LOGS ─────────────────────────────────────────────────────────────
+async function loadLogIPs() {
+  try {
+    const ips = await fetch('/api/logs/ips').then(r => r.json());
+    const sel = document.getElementById('f-ip');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All IPs</option>' +
+      ips.map(ip => `<option${ip === current ? ' selected' : ''}>${esc(ip)}</option>`).join('');
+  } catch {}
+}
+
+async function loadLogs(offset) {
+  logsOffset = offset;
+  const params = new URLSearchParams({
+    limit: PAGE, offset,
+    ip: v('f-ip'), path: v('f-path'), method: v('f-method'),
+    status: v('f-status'), q: v('f-q'),
+  });
+  const tbody = document.getElementById('logs-body');
+  try {
+    const { rows, total } = await fetch('/api/logs?' + params).then(r => r.json());
+    logsCache = rows;
+    logsTotal = total;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No logs found.</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(r => `
+        <tr onclick="openModal(${r.id})">
+          <td class="cell-mono cell-dim" style="white-space:nowrap">${fmtTime(r.created_at)}</td>
+          <td class="cell-mono">${r.ip ?? ''}</td>
+          <td><span class="badge badge-${(r.method||'').toLowerCase()}">${r.method}</span></td>
+          <td class="cell-mono truncate" title="${esc(r.path)}">${esc(r.path)}</td>
+          <td class="${statusClass(r.status_code)}">${r.status_code ?? ''}</td>
+          <td class="cell-dim">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</td>
+        </tr>
+      `).join('');
+    }
+    updatePager('logs', offset, total);
+  } catch { tbody.innerHTML = '<tr><td colspan="6" class="empty">Error loading logs.</td></tr>'; }
+}
+
+function logsPage(dir) { loadLogs(Math.max(0, logsOffset + dir * PAGE)); }
+
+// ── MODAL ─────────────────────────────────────────────────────────────
+function showModal(title, bodyHtml) {
+  document.getElementById('modal-title').innerHTML = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function field(label, value, full = false, mono = false) {
+  return `<div class="modal-field${full ? ' full' : ''}">
+    <div class="modal-label">${label}</div>
+    <div class="modal-value${mono ? ' mono' : ''}">${value ?? '<span style="color:#52525b">—</span>'}</div>
+  </div>`;
+}
+
+function fmtJson(val) {
+  if (val == null) return '<span style="color:#52525b">—</span>';
+  try { return esc(JSON.stringify(JSON.parse(val), null, 2)); } catch { return esc(String(val)); }
+}
+
+function openModal(id) {
+  const row = logsCache.find(r => r.id === id);
+  if (!row) return;
+  const title = `<span class="badge badge-${(row.method||'').toLowerCase()}">${row.method}</span>
+    <span style="margin-left:10px;font-family:monospace">${esc(row.path)}</span>`;
+  showModal(title,
+    field('Time', fmtTime(row.created_at), false, true) +
+    field('IP', row.ip, false, true) +
+    `<div class="modal-field"><div class="modal-label">Status</div>
+      <div class="modal-value mono ${statusClass(row.status_code)}">${row.status_code ?? '—'}</div></div>` +
+    field('Duration', row.duration_ms != null ? row.duration_ms + ' ms' : null, false, true) +
+    field('Headers', fmtJson(row.headers), true, true) +
+    field('Request Body', fmtJson(row.body), true, true) +
+    field('Response', fmtJson(row.response), true, true)
+  );
+}
+
+function openDeviceModal(i) {
+  const d = devicesCache[i];
+  if (!d) return;
+  showModal(`<span style="font-family:monospace">${d.mac_address}</span> &nbsp;<span style="color:#71717a;font-size:14px">${d.friendly_id}</span>`,
+    field('MAC Address', d.mac_address, false, true) +
+    field('Friendly ID', d.friendly_id, false, true) +
+    field('API Key', d.api_key, true, true) +
+    field('Model', d.model) +
+    field('Firmware', d.fw_version) +
+    field('Refresh Rate', d.refresh_rate + ' s') +
+    field('Widget Index', String(d.widget_index)) +
+    field('Created', fmtTime(d.created_at)) +
+    field('Last Seen', d.last_seen ? fmtTime(d.last_seen) : null)
+  );
+}
+
+function openDeviceLogModal(i) {
+  const row = dlogsCache[i];
+  if (!row) return;
+  showModal(`Device Log &nbsp;<span style="color:#71717a;font-size:14px;font-family:monospace">${row.mac_address ?? '—'}</span>`,
+    field('Time', fmtTime(row.created_at), false, true) +
+    field('MAC Address', row.mac_address, false, true) +
+    field('API Key', row.api_key, false, true) +
+    field('Payload', fmtJson(row.payload), true, true)
+  );
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay') && e.target !== document.getElementById('modal-close')) return;
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('modal-overlay').style.display = 'none'; });
+
+// ── DEVICES ──────────────────────────────────────────────────────────
+async function loadDevices() {
+  const tbody = document.getElementById('devices-body');
+  try {
+    const data = await fetch('/api/devices').then(r => r.json());
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No devices registered.</td></tr>';
+      return;
+    }
+    devicesCache = data;
+    tbody.innerHTML = data.map((d, i) => `
+      <tr style="cursor:pointer" onclick="openDeviceModal(${i})">
+        <td class="cell-mono">${d.mac_address}</td>
+        <td>${d.friendly_id}</td>
+        <td class="cell-mono truncate" title="${d.api_key}">${d.api_key.slice(0, 14)}…</td>
+        <td>${d.model ?? '<span class="cell-dim">—</span>'}</td>
+        <td>${d.fw_version ?? '<span class="cell-dim">—</span>'}</td>
+        <td class="cell-dim">${d.last_seen ? fmtTime(d.last_seen) : '—'}</td>
+        <td>${d.widget_index}</td>
+      </tr>
+    `).join('');
+  } catch { tbody.innerHTML = '<tr><td colspan="7" class="empty">Error loading devices.</td></tr>'; }
+}
+
+// ── DEVICE LOGS ───────────────────────────────────────────────────────
+async function loadDeviceLogs(offset) {
+  dlogsOffset = offset;
+  const params = new URLSearchParams({ limit: PAGE, offset, mac: v('f-dlmac') });
+  const tbody = document.getElementById('device-logs-body');
+  try {
+    const { rows, total } = await fetch('/api/device-logs?' + params).then(r => r.json());
+    dlogsTotal = total;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No device logs.</td></tr>';
+    } else {
+      dlogsCache = rows;
+      tbody.innerHTML = rows.map((r, i) => `
+        <tr style="cursor:pointer" onclick="openDeviceLogModal(${i})">
+          <td class="cell-mono cell-dim" style="white-space:nowrap">${fmtTime(r.created_at)}</td>
+          <td class="cell-mono">${r.mac_address ?? ''}</td>
+          <td class="cell-mono truncate" title="${r.api_key ?? ''}">${r.api_key ? r.api_key.slice(0, 14) + '…' : ''}</td>
+          <td class="cell-mono truncate" title="${esc(r.payload)}">${esc(r.payload).slice(0, 120)}</td>
+        </tr>
+      `).join('');
+    }
+    updatePager('dlogs', offset, total);
+  } catch { tbody.innerHTML = '<tr><td colspan="4" class="empty">Error loading device logs.</td></tr>'; }
+}
+
+function dlogsPage(dir) { loadDeviceLogs(Math.max(0, dlogsOffset + dir * PAGE)); }
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function v(id) { return document.getElementById(id)?.value?.trim() ?? ''; }
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+function statusClass(code) {
+  if (!code) return '';
+  const s = String(code)[0];
+  return s === '2' ? 'status-ok' : s === '4' ? 'status-warn' : s === '5' ? 'status-err' : '';
+}
+
+function updatePager(prefix, offset, total) {
+  document.getElementById(prefix + '-prev').disabled = offset === 0;
+  document.getElementById(prefix + '-next').disabled = offset + PAGE >= total;
+  const from = total === 0 ? 0 : offset + 1;
+  document.getElementById(prefix + '-info').textContent =
+    `${from}–${Math.min(offset + PAGE, total)} of ${total}`;
+}
+
+function toggleAutoRefresh() {
+  clearInterval(autoRefreshTimer);
+  if (document.getElementById('auto-refresh').checked)
+    autoRefreshTimer = setInterval(() => loadLogs(logsOffset), 5000);
+}
+
+loadWidgets();
+loadLogIPs();
+</script>
+</body>
+</html>

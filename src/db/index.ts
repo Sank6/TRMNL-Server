@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS device_logs (
 export function openDatabase(path: string): AppDB {
   const db = new Database(path);
   db.exec(MIGRATIONS);
-  // Additive migration: ip column added after initial release
+  // Additive migrations (safe to run on existing DBs)
   try { db.exec("ALTER TABLE request_logs ADD COLUMN ip TEXT;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE devices ADD COLUMN widget_index INTEGER NOT NULL DEFAULT 0;"); } catch { /* already exists */ }
   return db;
 }

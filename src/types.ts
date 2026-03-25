@@ -6,6 +6,7 @@ export interface Device {
   fw_version: string | null;
   model: string | null;
   refresh_rate: number;
+  widget_index: number;
   created_at: string;
   last_seen: string | null;
 }

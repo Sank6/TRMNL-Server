@@ -38,6 +38,21 @@ export function updateDeviceLastSeen(db: AppDB, mac: string): void {
   ).run(mac);
 }
 
+/**
+ * Atomically increments widget_index and updates last_seen.
+ * Returns the NEW widget_index value to use for image selection.
+ */
+export function advanceAndGetWidgetIndex(db: AppDB, mac: string): number {
+  db.prepare(
+    "UPDATE devices SET widget_index = widget_index + 1, last_seen = datetime('now') WHERE mac_address = ?"
+  ).run(mac);
+  return (findDeviceByMac(db, mac) as Device).widget_index;
+}
+
+export function listDevices(db: AppDB): Device[] {
+  return db.prepare("SELECT * FROM devices ORDER BY id DESC").all() as Device[];
+}
+
 export function updateDeviceFirmwareInfo(
   db: AppDB,
   mac: string,

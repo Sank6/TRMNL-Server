@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { DisplayHeadersSchema } from "../schemas/index.js";
-import { findDeviceByApiKey, updateDeviceLastSeen } from "../db/devices.js";
-import { pickImage } from "../utils/images.js";
+import { findDeviceByApiKey, advanceAndGetWidgetIndex } from "../db/devices.js";
+import { listImages, pickImage } from "../utils/images.js";
 import type { AppDB } from "../db/index.js";
 import type { Config } from "../config.js";
 import type { DisplayResponse } from "../types.js";
@@ -42,13 +42,12 @@ export const displayRoute: FastifyPluginAsync<{ db: AppDB; config: Config }> =
         } satisfies DisplayResponse);
       }
 
-      updateDeviceLastSeen(db, device.mac_address);
+      const widgetIdx = advanceAndGetWidgetIndex(db, device.mac_address);
 
-      const { image_url, filename } = pickImage(
-        config.imageDir,
-        config.baseUrl,
-        device.id
-      );
+      const widgetFiles = listImages(config.imageDir).filter((f) => f.startsWith("widget-"));
+      const pool = widgetFiles.length > 0 ? widgetFiles : listImages(config.imageDir);
+      const filename = pool.length > 0 ? pool[widgetIdx % pool.length] : "default.bmp";
+      const image_url = `${config.baseUrl}/images/${filename}`;
 
       const body: DisplayResponse = {
         status: 0,

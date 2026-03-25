@@ -28,6 +28,77 @@ export function insertRequestLog(
   });
 }
 
+export interface RequestLog {
+  id: number;
+  method: string;
+  path: string;
+  ip: string | null;
+  headers: string;
+  body: string | null;
+  status_code: number | null;
+  response: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface DeviceLog {
+  id: number;
+  mac_address: string | null;
+  api_key: string | null;
+  payload: string;
+  created_at: string;
+}
+
+export function queryRequestLogs(
+  db: AppDB,
+  opts: {
+    ip?: string;
+    path?: string;
+    method?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+    q?: string;
+  } = {}
+): { rows: RequestLog[]; total: number } {
+  const { ip, path, method, status, limit = 50, offset = 0, q } = opts;
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (ip) { conditions.push("ip LIKE @ip"); params.ip = `%${ip}%`; }
+  if (path) { conditions.push("path LIKE @path"); params.path = `%${path}%`; }
+  if (method) { conditions.push("method = @method"); params.method = method.toUpperCase(); }
+  if (status) { conditions.push("status_code = @status"); params.status = parseInt(status, 10); }
+  if (q) {
+    conditions.push("(path LIKE @q OR ip LIKE @q OR response LIKE @q)");
+    params.q = `%${q}%`;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const total = (db.prepare(`SELECT COUNT(*) as n FROM request_logs ${where}`).get(params) as { n: number }).n;
+  const rows = db.prepare(
+    `SELECT * FROM request_logs ${where} ORDER BY id DESC LIMIT @limit OFFSET @offset`
+  ).all({ ...params, limit, offset }) as RequestLog[];
+
+  return { rows, total };
+}
+
+export function listDeviceLogs(
+  db: AppDB,
+  opts: { limit?: number; offset?: number; mac?: string } = {}
+): { rows: DeviceLog[]; total: number } {
+  const { limit = 50, offset = 0, mac } = opts;
+  const where = mac ? "WHERE mac_address = @mac" : "";
+  const params: Record<string, unknown> = mac ? { mac } : {};
+
+  const total = (db.prepare(`SELECT COUNT(*) as n FROM device_logs ${where}`).get(params) as { n: number }).n;
+  const rows = db.prepare(
+    `SELECT * FROM device_logs ${where} ORDER BY id DESC LIMIT @limit OFFSET @offset`
+  ).all({ ...params, limit, offset }) as DeviceLog[];
+
+  return { rows, total };
+}
+
 export function insertDeviceLog(
   db: AppDB,
   entry: {

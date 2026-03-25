@@ -18,6 +18,10 @@ export const TEST_CONFIG: Config = {
   imageDir: "./public/images",
   defaultRefreshRate: 900,
   logLevel: "silent",
+  weatherLat: 51.5074,
+  weatherLon: -0.1278,
+  weatherLocation: "London",
+  dashboardPort: 3002,
 };
 
 export async function buildTestApp(db?: AppDB): Promise<FastifyInstance> {
