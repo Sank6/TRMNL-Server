@@ -1,11 +1,10 @@
 import { cpus, freemem, totalmem, uptime } from "os";
-import sharp from "sharp";
-import { encodeGrayscaleBmp } from "./bmp.js";
+import { svgToBmp, DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./image-pipeline.js";
 import type { Config } from "../config.js";
 import type { WidgetDefinition } from "./types.js";
 
-const W = 800;
-const H = 480;
+const W = DISPLAY_WIDTH;
+const H = DISPLAY_HEIGHT;
 
 // ── CPU sampling (works cross-platform including Windows) ───────────────────
 
@@ -117,12 +116,7 @@ export async function renderSystemBmp(config: Config): Promise<Buffer> {
   const uptimeStr = formatUptime(uptime());
 
   const svg = buildSystemSvg(cpu, ramUsed, ramTotal, uptimeStr, config.baseUrl);
-  const { data } = await sharp(Buffer.from(svg))
-    .resize(W, H)
-    .grayscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return encodeGrayscaleBmp(data as unknown as Buffer, W, H);
+  return svgToBmp(svg);
 }
 
 export const systemWidget: WidgetDefinition = {

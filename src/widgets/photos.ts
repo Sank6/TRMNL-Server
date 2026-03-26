@@ -2,32 +2,28 @@ import sharp from "sharp";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { Config } from "../config.js";
-import { encodeGrayscaleBmp } from "./bmp.js";
-import { floydSteinberg } from "./dither.js";
+import {
+  imageToBmp,
+  placeholderBmp,
+  escapeXml,
+  trimText,
+  DISPLAY_WIDTH,
+  DISPLAY_HEIGHT,
+} from "./image-pipeline.js";
 import type { WidgetDefinition } from "./types.js";
 
-const W = 800;
-const H = 480;
+const W = DISPLAY_WIDTH;
+const H = DISPLAY_HEIGHT;
 const FOOTER_H = 56;
 const PHOTO_H = H - FOOTER_H;
-const MIN_DISPLAY_EDGE = Math.min(W, PHOTO_H);
-const MAX_DISPLAY_EDGE = Math.max(W, PHOTO_H);
 export const PHOTOS_ORIGINAL_CACHE_FILENAME = "widget-photos-original.bin";
 export const PHOTOS_FITTED_PREVIEW_FILENAME = "widget-photos-fitted-preview.png";
 const ICLOUD_SHARED_STREAMS_HOST = "sharedstreams.icloud.com";
 const REQUEST_TIMEOUT_MS = 15_000;
 const FETCH_RETRY_ATTEMPTS = 3;
 const FETCH_RETRY_DELAY_MS = 500;
-const BAYER_8X8 = [
-  [0, 48, 12, 60, 3, 51, 15, 63],
-  [32, 16, 44, 28, 35, 19, 47, 31],
-  [8, 56, 4, 52, 11, 59, 7, 55],
-  [40, 24, 36, 20, 43, 27, 39, 23],
-  [2, 50, 14, 62, 1, 49, 13, 61],
-  [34, 18, 46, 30, 33, 17, 45, 29],
-  [10, 58, 6, 54, 9, 57, 5, 53],
-  [42, 26, 38, 22, 41, 25, 37, 21],
-];
+
+// ── Apple Photos API types ──────────────────────────────────────────────────
 
 interface SharedStreamDerivative {
   checksum?: string;
@@ -88,24 +84,12 @@ interface PhotoImagePayload {
   dateLabel: string;
 }
 
-interface ResizePlan {
-  width: number;
-  height: number;
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
+// ── Display-size derivative selection ───────────────────────────────────────
 
-interface RawImageInfo {
-  width: number;
-  height: number;
-  channels: number;
-}
+const MIN_DISPLAY_EDGE = Math.min(W, PHOTO_H);
+const MAX_DISPLAY_EDGE = Math.max(W, PHOTO_H);
 
-function trimText(value: string, maxLength: number): string {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
-}
+// ── Token resolution ────────────────────────────────────────────────────────
 
 export function resolveSharedAlbumToken(urlOrToken?: string): string | null {
   if (!urlOrToken) return null;
@@ -128,6 +112,8 @@ export function resolveSharedAlbumToken(urlOrToken?: string): string | null {
     return null;
   }
 }
+
+// ── Photo selection from stream ─────────────────────────────────────────────
 
 export function selectPhotoFromStream(
   stream: SharedStreamResponse,
@@ -223,6 +209,8 @@ function derivativeFileSize(derivative: SharedStreamDerivative): number {
   return Number.isFinite(fileSize) ? fileSize : Number.POSITIVE_INFINITY;
 }
 
+// ── Footer ──────────────────────────────────────────────────────────────────
+
 function formatPhotoDate(isoDate: string): string {
   if (!isoDate) return "Unknown date";
 
@@ -251,155 +239,7 @@ function buildFooterSvg(albumName: string, caption: string, dateLabel: string): 
 </svg>`;
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function orderedDither(pixels: Buffer, width: number, height: number): Buffer {
-  const out = Buffer.alloc(pixels.length);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = y * width + x;
-      const threshold = (BAYER_8X8[y % 8]![x % 8]! + 0.5) * 4;
-      out[idx] = pixels[idx] < threshold ? 0 : 255;
-    }
-  }
-  return out;
-}
-
-export function planContainedPhotoResize(
-  sourceWidth: number,
-  sourceHeight: number,
-  targetWidth: number,
-  targetHeight: number
-): ResizePlan {
-  if (sourceWidth <= 0 || sourceHeight <= 0) {
-    throw new Error("Photo dimensions must be positive");
-  }
-
-  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight, 1);
-  const width = Math.max(1, Math.round(sourceWidth * scale));
-  const height = Math.max(1, Math.round(sourceHeight * scale));
-  const horizontalPadding = targetWidth - width;
-  const verticalPadding = targetHeight - height;
-
-  return {
-    width,
-    height,
-    left: Math.floor(horizontalPadding / 2),
-    right: Math.ceil(horizontalPadding / 2),
-    top: Math.floor(verticalPadding / 2),
-    bottom: Math.ceil(verticalPadding / 2),
-  };
-}
-
-export function normalizeRawGrayscalePixels(
-  pixels: Buffer,
-  info: RawImageInfo
-): Buffer {
-  const { width, height, channels } = info;
-  const expectedLength = width * height * channels;
-
-  if (channels < 1 || channels > 4) {
-    throw new Error(`Unsupported raw image channel count: ${channels}`);
-  }
-
-  if (pixels.length !== expectedLength) {
-    throw new Error(
-      `Raw image buffer length mismatch: expected ${expectedLength} bytes, got ${pixels.length}`
-    );
-  }
-
-  if (channels === 1) {
-    return pixels;
-  }
-
-  const out = Buffer.alloc(width * height);
-  for (let i = 0; i < width * height; i++) {
-    const offset = i * channels;
-    const r = pixels[offset]!;
-    const g = channels >= 3 ? pixels[offset + 1]! : r;
-    const b = channels >= 3 ? pixels[offset + 2]! : r;
-    const alpha = channels === 2
-      ? pixels[offset + 1]! / 255
-      : channels === 4
-        ? pixels[offset + 3]! / 255
-        : 1;
-    const luma = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-    out[i] = Math.round((luma * alpha) + (255 * (1 - alpha)));
-  }
-
-  return out;
-}
-
-async function fitPhotoWithinViewport(image: Buffer): Promise<Buffer> {
-  const normalized = sharp(image).rotate();
-  const metadata = await normalized.metadata();
-  const sourceWidth = metadata.width ?? 0;
-  const sourceHeight = metadata.height ?? 0;
-  const plan = planContainedPhotoResize(sourceWidth, sourceHeight, W, PHOTO_H);
-
-  return normalized
-    .resize(plan.width, plan.height, {
-      fit: "fill",
-      withoutEnlargement: true,
-    })
-    .extend({
-      left: plan.left,
-      right: plan.right,
-      top: plan.top,
-      bottom: plan.bottom,
-      background: { r: 255, g: 255, b: 255 },
-    })
-    .grayscale()
-    .toBuffer();
-}
-
-async function placeholderBmp(message: string): Promise<Buffer> {
-  const label = trimText(
-    message.includes("PHOTOS_SHARED_ALBUM") ? "Missing Config" : message,
-    20
-  );
-
-  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1d1d1d"/>
-      <stop offset="44%" stop-color="#8f8f8f"/>
-      <stop offset="100%" stop-color="#f4f4f4"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="76%" cy="22%" r="46%">
-      <stop offset="0%" stop-color="#fafafa"/>
-      <stop offset="55%" stop-color="#cecece"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  <rect width="${W}" height="${H}" fill="url(#glow)"/>
-  <path d="M 0 392 C 130 346, 246 366, 336 334 S 564 286, 800 320 L 800 ${H} L 0 ${H} Z"
-    fill="#dadada"/>
-  <circle cx="624" cy="172" r="88" fill="#f6f6f6"/>
-  <rect x="526" y="406" width="230" height="48" fill="white"/>
-  <text x="641" y="430"
-    text-anchor="middle" dominant-baseline="middle"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="30" fill="black">${escapeXml(label)}</text>
-</svg>`;
-
-  const { data, info } = await sharp(Buffer.from(svg))
-    .resize(W, H)
-    .grayscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const grayscale = normalizeRawGrayscalePixels(data as unknown as Buffer, info);
-  return encodeGrayscaleBmp(orderedDither(grayscale, W, H), W, H);
-}
+// ── Network helpers ─────────────────────────────────────────────────────────
 
 function describeFetchError(prefix: string, url: string, error: unknown): Error {
   if (error instanceof Error) {
@@ -478,6 +318,8 @@ async function postJson(url: string, payload: unknown): Promise<Response> {
   }, "Apple Photos API request failed");
 }
 
+// ── Apple Photos API ────────────────────────────────────────────────────────
+
 async function resolvePhoto(token: string): Promise<ResolvedPhoto> {
   let baseUrl = `https://${ICLOUD_SHARED_STREAMS_HOST}/${token}/sharedstreams`;
   let response = await postJson(`${baseUrl}/webstream`, { streamCtag: null });
@@ -552,15 +394,10 @@ async function fetchPhotoImage(): Promise<PhotoImagePayload> {
 
   const photo = await resolvePhoto(token);
 
-  let imageResponse: Response;
-  try {
-    imageResponse = await fetchWithRetries(photo.imageUrl, {
-      headers: { "user-agent": "xteink-server/1.0" },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    }, "Apple Photos image request failed");
-  } catch (error) {
-    throw error;
-  }
+  const imageResponse = await fetchWithRetries(photo.imageUrl, {
+    headers: { "user-agent": "xteink-server/1.0" },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }, "Apple Photos image request failed");
 
   if (!imageResponse.ok) {
     throw new Error(`Apple Photos image fetch failed with HTTP ${imageResponse.status}`);
@@ -571,6 +408,26 @@ async function fetchPhotoImage(): Promise<PhotoImagePayload> {
     label: photo.label,
     dateLabel: photo.dateLabel,
   };
+}
+
+// ── Caching ─────────────────────────────────────────────────────────────────
+
+let cachedBmp: Buffer | null = null;
+let cachedOriginalImage: Buffer | null = null;
+let lastPhotosError: string | null = null;
+
+export function resetPhotosCacheForTests(): void {
+  cachedBmp = null;
+  cachedOriginalImage = null;
+  lastPhotosError = null;
+}
+
+export function setCachedOriginalPhotoForTests(image: Buffer | null): void {
+  cachedOriginalImage = image;
+}
+
+export function getLastPhotosError(): string | null {
+  return lastPhotosError;
 }
 
 export async function fetchOriginalPhotoImage(): Promise<Buffer> {
@@ -584,11 +441,11 @@ export async function fetchOriginalPhotoImage(): Promise<Buffer> {
 }
 
 export async function fetchOriginalPhotoImageFromCacheOrSource(imageDir?: string): Promise<Buffer> {
-  let diskCachedImage: Buffer | null = null;
-
   if (cachedOriginalImage) {
     return cachedOriginalImage;
   }
+
+  let diskCachedImage: Buffer | null = null;
 
   if (imageDir) {
     const originalPath = join(imageDir, PHOTOS_ORIGINAL_CACHE_FILENAME);
@@ -622,7 +479,11 @@ export async function fetchFittedPhotoPreviewFromCacheOrSource(imageDir?: string
   }
 
   const original = await fetchOriginalPhotoImageFromCacheOrSource(imageDir);
-  const fittedPreview = await sharp(await fitPhotoWithinViewport(original)).png().toBuffer();
+  const fittedPreview = await sharp(original)
+    .rotate()
+    .resize(W, PHOTO_H, { fit: "cover", position: "centre" })
+    .png()
+    .toBuffer();
 
   if (imageDir) {
     writeFileSync(join(imageDir, PHOTOS_FITTED_PREVIEW_FILENAME), fittedPreview);
@@ -631,23 +492,7 @@ export async function fetchFittedPhotoPreviewFromCacheOrSource(imageDir?: string
   return fittedPreview;
 }
 
-let cachedBmp: Buffer | null = null;
-let cachedOriginalImage: Buffer | null = null;
-let lastPhotosError: string | null = null;
-
-export function resetPhotosCacheForTests(): void {
-  cachedBmp = null;
-  cachedOriginalImage = null;
-  lastPhotosError = null;
-}
-
-export function setCachedOriginalPhotoForTests(image: Buffer | null): void {
-  cachedOriginalImage = image;
-}
-
-export function getLastPhotosError(): string | null {
-  return lastPhotosError;
-}
+// ── Render ──────────────────────────────────────────────────────────────────
 
 export async function renderPhotosBmp(config?: Config): Promise<Buffer> {
   let photo: PhotoImagePayload;
@@ -665,8 +510,9 @@ export async function renderPhotosBmp(config?: Config): Promise<Buffer> {
     }
     if (cachedBmp) return cachedBmp;
 
-    const message = lastPhotosError;
-    return placeholderBmp(message);
+    return placeholderBmp(
+      lastPhotosError.includes("PHOTOS_SHARED_ALBUM") ? "Missing Config" : lastPhotosError
+    );
   }
 
   cachedOriginalImage = photo.image;
@@ -674,22 +520,21 @@ export async function renderPhotosBmp(config?: Config): Promise<Buffer> {
     writeFileSync(join(config.imageDir, PHOTOS_ORIGINAL_CACHE_FILENAME), photo.image);
   }
 
-  const photoGray = await fitPhotoWithinViewport(photo.image);
+  // Save a fitted preview PNG for the dashboard
   if (config?.imageDir) {
-    const previewPng = await sharp(photoGray).png().toBuffer();
+    const previewPng = await sharp(photo.image)
+      .rotate()
+      .resize(W, PHOTO_H, { fit: "cover", position: "centre" })
+      .png()
+      .toBuffer();
     writeFileSync(join(config.imageDir, PHOTOS_FITTED_PREVIEW_FILENAME), previewPng);
   }
 
-  const { data, info } = await sharp(photoGray)
-    .extend({ bottom: FOOTER_H, background: { r: 255, g: 255, b: 255 } })
-    .composite([{ input: Buffer.from(buildFooterSvg("Apple Photos", photo.label, photo.dateLabel)), blend: "over" }])
-    .grayscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const grayscale = normalizeRawGrayscalePixels(data as unknown as Buffer, info);
-  const dithered = floydSteinberg(grayscale, W, H);
-  cachedBmp = encodeGrayscaleBmp(dithered, W, H);
+  // Render: cover-fit into photo area, then overlay the footer
+  cachedBmp = await imageToBmp(photo.image, {
+    viewport: { width: W, height: PHOTO_H },
+    overlay: buildFooterSvg("Apple Photos", photo.label, photo.dateLabel),
+  });
   return cachedBmp;
 }
 

@@ -1,9 +1,8 @@
-import sharp from "sharp";
-import { encodeGrayscaleBmp } from "./bmp.js";
+import { svgToBmp, DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./image-pipeline.js";
 import type { WidgetDefinition } from "./types.js";
 
-const W = 800;
-const H = 480;
+const W = DISPLAY_WIDTH;
+const H = DISPLAY_HEIGHT;
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -43,12 +42,7 @@ function buildClockSvg(): string {
 }
 
 export async function renderClockBmp(): Promise<Buffer> {
-  const { data } = await sharp(Buffer.from(buildClockSvg()))
-    .resize(W, H)
-    .grayscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return encodeGrayscaleBmp(data as unknown as Buffer, W, H);
+  return svgToBmp(buildClockSvg());
 }
 
 export const clockWidget: WidgetDefinition = {

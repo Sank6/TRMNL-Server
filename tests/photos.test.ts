@@ -9,8 +9,6 @@ import {
   fetchFittedPhotoPreviewFromCache,
   fetchOriginalPhotoImage,
   fetchOriginalPhotoImageFromCacheOrSource,
-  normalizeRawGrayscalePixels,
-  planContainedPhotoResize,
   resolveSharedAlbumToken,
   resetPhotosCacheForTests,
   setCachedOriginalPhotoForTests,
@@ -146,52 +144,5 @@ describe("photos widget helpers", () => {
         },
       },
     }, "abc123")).toBe("https://cvws.icloud-content.com/S/example.JPG");
-  });
-
-  it("fits landscape photos without cropping", () => {
-    expect(planContainedPhotoResize(4000, 3000, 800, 424)).toEqual({
-      width: 565,
-      height: 424,
-      left: 117,
-      right: 118,
-      top: 0,
-      bottom: 0,
-    });
-  });
-
-  it("fits portrait photos without cropping", () => {
-    expect(planContainedPhotoResize(3000, 4000, 800, 424)).toEqual({
-      width: 318,
-      height: 424,
-      left: 241,
-      right: 241,
-      top: 0,
-      bottom: 0,
-    });
-  });
-
-  it("normalizes RGB raw output to a single grayscale byte per pixel", () => {
-    const pixels = Buffer.from([
-      0, 0, 0,
-      255, 255, 255,
-      40, 40, 40,
-      200, 200, 200,
-    ]);
-
-    expect(normalizeRawGrayscalePixels(pixels, { width: 2, height: 2, channels: 3 })).toEqual(
-      Buffer.from([0, 255, 40, 200])
-    );
-  });
-
-  it("flattens alpha onto white when normalizing raw grayscale pixels", () => {
-    const pixels = Buffer.from([
-      0, 255,
-      0, 128,
-      255, 0,
-    ]);
-
-    expect(normalizeRawGrayscalePixels(pixels, { width: 3, height: 1, channels: 2 })).toEqual(
-      Buffer.from([0, 127, 255])
-    );
   });
 });
