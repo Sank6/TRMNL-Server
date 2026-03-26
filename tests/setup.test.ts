@@ -8,6 +8,7 @@ import {
   TEST_CONFIG,
 } from "./helpers.js";
 import type { AppDB } from "../src/db/index.js";
+import { setWidgetEnabled } from "../src/db/widgets.js";
 
 describe("GET /api/setup", () => {
   let app: FastifyInstance;
@@ -133,5 +134,29 @@ describe("GET /api/setup", () => {
       .get(DEVICE_MAC) as { fw_version: string; model: string };
     expect(row.fw_version).toBe("2.3.1");
     expect(row.model).toBe("xteink-x4");
+  });
+  it("does not assign disabled widgets during setup", async () => {
+    const widgetNames = [
+      "analog-clock",
+      "calendar",
+      "clock",
+      "panel",
+      "photos",
+      "system",
+      "weather",
+    ];
+
+    for (const name of widgetNames) {
+      setWidgetEnabled(db, name, name === "calendar");
+    }
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/setup",
+      headers: { id: DEVICE_MAC, "content-type": "application/json" },
+    });
+
+    const { image_url } = res.json<{ image_url: string }>();
+    expect(image_url).toContain("/images/widget-calendar.bmp");
   });
 });

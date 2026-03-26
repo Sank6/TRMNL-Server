@@ -28,13 +28,15 @@ function buildCalendarSvg(): string {
   const gridBottom = H - 28;
   const cellW = Math.floor((gridRight - gridLeft) / 7);
   const cellH = Math.floor((gridBottom - gridTop) / numRows);
+  const separatorTop = gridTop + 18;
+  const separatorBottom = gridTop + numRows * cellH;
 
   // Vertical column separators — between columns only, no outer borders.
-  // Only span the date grid, not the weekday header row.
+  // Only span the body of the date grid, leaving whitespace below the weekday labels.
   let colSeparators = "";
   for (let c = 1; c < 7; c++) {
     const x = gridLeft + c * cellW;
-    colSeparators += `<line x1="${x}" y1="${gridTop}" x2="${x}" y2="${gridBottom}" stroke="black" stroke-width="1"/>`;
+    colSeparators += `<line x1="${x}" y1="${separatorTop}" x2="${x}" y2="${separatorBottom}" stroke="black" stroke-width="1"/>`;
   }
 
   // Day-of-week header labels

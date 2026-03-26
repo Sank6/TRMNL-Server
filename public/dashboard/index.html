@@ -67,11 +67,20 @@
     border-radius: 12px;
     padding: 22px;
   }
+  .widget-card.disabled {
+    opacity: 0.7;
+  }
   .widget-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 14px;
+    gap: 12px;
+  }
+  .widget-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   .widget-card h3 {
     font-size: 18px;
@@ -84,6 +93,20 @@
     border: 1px solid #27272a;
     display: block;
     background: #09090b;
+  }
+  .widget-card.disabled img {
+    filter: grayscale(1);
+  }
+  .widget-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .widget-card-controls {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
   .widget-meta {
     margin-top: 10px;
@@ -189,6 +212,8 @@
   .badge-post { background: #14532d; color: #4ade80; }
   .badge-put  { background: #451a03; color: #fb923c; }
   .badge-del  { background: #450a0a; color: #f87171; }
+  .badge-enabled { background: #14532d; color: #86efac; }
+  .badge-disabled { background: #3f3f46; color: #d4d4d8; }
 
   .status-ok   { color: #4ade80; font-weight: 600; }
   .status-err  { color: #f87171; font-weight: 600; }
@@ -236,6 +261,9 @@
     display: flex; flex-direction: column;
     overflow: hidden;
   }
+  #modal.modal-wide {
+    width: min(1240px, 96vw);
+  }
   #modal-header {
     display: flex; justify-content: space-between; align-items: center;
     padding: 18px 22px;
@@ -252,6 +280,9 @@
     overflow-y: auto; padding: 20px 22px;
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
   }
+  #modal-body.modal-single {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .modal-field { display: flex; flex-direction: column; gap: 4px; }
   .modal-field.full { grid-column: 1 / -1; }
   .modal-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #52525b; }
@@ -261,6 +292,48 @@
     padding: 8px 10px; white-space: pre-wrap; min-height: 32px;
   }
   .modal-value.mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 13px; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .compare-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .compare-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #a1a1aa;
+  }
+  .compare-frame {
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .compare-frame img {
+    width: 100%;
+    display: block;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #27272a;
+  }
+  .compare-note {
+    font-size: 13px;
+    color: #71717a;
+  }
+  @media (min-width: 980px) {
+    .compare-grid {
+      grid-template-columns: minmax(0, 800px) minmax(0, 1fr);
+      align-items: start;
+    }
+  }
 
   tbody tr { cursor: pointer; }
 </style>
@@ -389,12 +462,27 @@ async function loadWidgets() {
     const data = await fetch('/api/widgets').then(r => r.json());
     if (!data.length) { grid.innerHTML = '<p class="empty">No widgets found.</p>'; return; }
     grid.innerHTML = data.map(w => `
-      <div class="widget-card" id="card-${w.name}">
+      <div class="widget-card${w.enabled ? '' : ' disabled'}" id="card-${w.name}" data-enabled="${w.enabled}">
         <div class="widget-card-header">
-          <h3>${w.name}</h3>
-          <button class="btn btn-sm" onclick="regenerate('${w.name}', this)">Regenerate</button>
+          <div class="widget-card-title">
+            <h3>${w.name}</h3>
+            <span class="badge ${w.enabled ? 'badge-enabled' : 'badge-disabled'}" id="widget-state-${w.name}">
+              ${w.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div class="widget-actions">
+            <button class="btn btn-sm" onclick="toggleWidget('${w.name}', ${w.enabled ? 'false' : 'true'}, this)">
+              ${w.enabled ? 'Disable' : 'Enable'}
+            </button>
+            <button class="btn btn-sm" onclick="regenerate('${w.name}', this)">Regenerate</button>
+          </div>
         </div>
         <img src="/api/widgets/${w.name}.png?t=${Date.now()}" alt="${w.name}">
+        ${w.name === 'photos' ? `
+          <div class="widget-card-controls">
+            <button class="btn btn-sm" onclick="openPhotoCompare(this)">Compare Original</button>
+          </div>
+        ` : ''}
         <div class="widget-meta">
           <span>${(w.size / 1024).toFixed(1)} KB</span>
           <span>${fmtTime(w.mtime)}</span>
@@ -402,6 +490,27 @@ async function loadWidgets() {
       </div>
     `).join('');
   } catch { grid.innerHTML = '<p class="empty">Failed to load widgets.</p>'; }
+}
+
+async function toggleWidget(name, enabled, btn) {
+  btn.disabled = true;
+  const previous = btn.textContent;
+  btn.textContent = '…';
+  try {
+    const res = await fetch('/api/widgets/' + name + '/enabled', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('toggle failed');
+    await loadWidgets();
+  } catch {
+    btn.textContent = 'Error';
+    setTimeout(() => {
+      btn.textContent = previous;
+      btn.disabled = false;
+    }, 1500);
+  }
 }
 
 async function regenerate(name, btn) {
@@ -416,6 +525,53 @@ async function regenerate(name, btn) {
   } catch {
     btn.textContent = 'Error'; btn.disabled = false;
   }
+}
+
+function openPhotoCompare(btn) {
+  const cacheBust = Date.now();
+  showModal('Photos Compare',
+    `<div class="compare-grid">
+      <div class="compare-panel">
+        <div class="compare-label">Processed Photo</div>
+        <div class="compare-frame">
+          <img src="/api/widgets/photos/fitted.png?t=${cacheBust}" alt="Processed Apple Photos image"
+            onerror="handlePhotoCompareImageError(this, 'processed')">
+        </div>
+        <div class="compare-note">This is the centered, downsized photo area before the footer and final 1-bit dithering.</div>
+      </div>
+      <div class="compare-panel">
+        <div class="compare-label">Original Fetch</div>
+        <div class="compare-frame">
+          <img src="/api/widgets/photos/original.png?t=${cacheBust}" alt="Original Apple Photos image"
+            onerror="handlePhotoCompareImageError(this, 'original')">
+        </div>
+        <div class="compare-note">This is the source image fetched from the shared album before widget processing.</div>
+      </div>
+    </div>`,
+    { wide: true, singleColumn: true }
+  );
+  if (btn) btn.blur();
+}
+
+function handlePhotoCompareImageError(img, kind) {
+  const frame = img.closest('.compare-frame');
+  if (!frame) return;
+
+  if (kind === 'processed') {
+    frame.innerHTML = '<div class="empty" style="padding:32px 16px">Processed preview unavailable. Regenerate the widget and try again.</div>';
+    return;
+  }
+
+  frame.innerHTML = '<div class="empty" style="padding:32px 16px">Loading full error…</div>';
+  fetch('/api/widgets/photos/status')
+    .then(r => r.json())
+    .then(({ error }) => {
+      const detail = error ? esc(error) : 'Original image unavailable. Check server logs.';
+      frame.innerHTML = `<div class="empty" style="padding:24px 16px; text-align:left; white-space:pre-wrap">${detail}</div>`;
+    })
+    .catch(() => {
+      frame.innerHTML = '<div class="empty" style="padding:32px 16px">Original image unavailable. Check server logs.</div>';
+    });
 }
 
 // ── LOGS ─────────────────────────────────────────────────────────────
@@ -462,9 +618,13 @@ async function loadLogs(offset) {
 function logsPage(dir) { loadLogs(Math.max(0, logsOffset + dir * PAGE)); }
 
 // ── MODAL ─────────────────────────────────────────────────────────────
-function showModal(title, bodyHtml) {
+function showModal(title, bodyHtml, options = {}) {
+  const modal = document.getElementById('modal');
+  const body = document.getElementById('modal-body');
   document.getElementById('modal-title').innerHTML = title;
-  document.getElementById('modal-body').innerHTML = bodyHtml;
+  body.innerHTML = bodyHtml;
+  modal.classList.toggle('modal-wide', Boolean(options.wide));
+  body.classList.toggle('modal-single', Boolean(options.singleColumn));
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
@@ -526,10 +686,12 @@ function openDeviceLogModal(i) {
 
 function closeModal(e) {
   if (e && e.target !== document.getElementById('modal-overlay') && e.target !== document.getElementById('modal-close')) return;
+  document.getElementById('modal').classList.remove('modal-wide');
+  document.getElementById('modal-body').classList.remove('modal-single');
   document.getElementById('modal-overlay').style.display = 'none';
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('modal-overlay').style.display = 'none'; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ── DEVICES ──────────────────────────────────────────────────────────
 async function loadDevices() {

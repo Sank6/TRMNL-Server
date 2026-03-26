@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import { buildApp } from "../src/app.js";
+import { buildDashboard } from "../src/dashboard/server.js";
 import type { FastifyInstance } from "fastify";
 import type { Config } from "../src/config.js";
 import type { AppDB } from "../src/db/index.js";
@@ -17,6 +17,7 @@ export const TEST_CONFIG: Config = {
   dbPath: ":memory:",
   imageDir: "./public/images",
   defaultRefreshRate: 900,
+  widgetRefreshIntervalMs: 30000,
   logLevel: "silent",
   weatherLat: 51.5074,
   weatherLon: -0.1278,
@@ -28,6 +29,11 @@ export async function buildTestApp(db?: AppDB): Promise<FastifyInstance> {
   const testDb = db ?? createTestDB();
   const app = await buildApp(TEST_CONFIG, testDb);
   return app;
+}
+
+export async function buildTestDashboard(db?: AppDB): Promise<FastifyInstance> {
+  const testDb = db ?? createTestDB();
+  return buildDashboard(TEST_CONFIG, testDb);
 }
 
 export const DEVICE_MAC = "AA:BB:CC:DD:EE:FF";

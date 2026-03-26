@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
-import { z } from "zod";
 import { SetupHeadersSchema } from "../schemas/index.js";
 import {
   findDeviceByMac,
@@ -8,10 +7,23 @@ import {
   updateDeviceFirmwareInfo,
 } from "../db/devices.js";
 import { generateFriendlyId } from "../utils/friendly-id.js";
-import { pickImage } from "../utils/images.js";
+import { listNonWidgetImages, listWidgetImages, pickImageFromPool } from "../utils/images.js";
 import type { AppDB } from "../db/index.js";
 import type { Config } from "../config.js";
 import type { SetupResponse } from "../types.js";
+import { listWidgetStates } from "../db/widgets.js";
+
+function listEnabledWidgetImages(db: AppDB, imageDir: string): string[] {
+  const widgetImages = listWidgetImages(imageDir);
+  const enabledByName = new Map(
+    listWidgetStates(db).map((row) => [row.name, row.enabled === 1] as const)
+  );
+
+  return widgetImages.filter((filename) => {
+    const name = filename.replace(/^widget-/, "").replace(/\.bmp$/, "");
+    return enabledByName.get(name) ?? true;
+  });
+}
 
 export const setupRoute: FastifyPluginAsync<{ db: AppDB; config: Config }> =
   async (fastify, opts) => {
@@ -46,7 +58,13 @@ export const setupRoute: FastifyPluginAsync<{ db: AppDB; config: Config }> =
         updateDeviceFirmwareInfo(db, mac, fwVersion, model);
       }
 
-      const { image_url } = pickImage(config.imageDir, config.baseUrl, device.id);
+      const widgetPool = listEnabledWidgetImages(db, config.imageDir);
+      const fallbackPool = listNonWidgetImages(config.imageDir);
+      const { image_url } = pickImageFromPool(
+        config.baseUrl,
+        widgetPool.length > 0 ? widgetPool : fallbackPool,
+        device.id
+      );
 
       const body: SetupResponse = {
         status: 200,

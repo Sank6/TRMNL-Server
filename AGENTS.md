@@ -21,3 +21,8 @@ Check:
 - No grey fills or strokes on structural elements that could threshold to white
 
 Do not consider the widget done until you have seen the rendered output.
+
+## Dependency installs
+
+Do not run `bun install`, `npm install`, or any other dependency installation command unless the user explicitly asks for it.
+This repo is used across Windows and WSL, and reinstalling native modules from the wrong environment can break the working setup.

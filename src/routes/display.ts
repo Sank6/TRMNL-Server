@@ -1,10 +1,16 @@
 import type { FastifyPluginAsync } from "fastify";
 import { DisplayHeadersSchema } from "../schemas/index.js";
 import { findDeviceByApiKey, advanceAndGetWidgetIndex } from "../db/devices.js";
-import { listImages, pickImage } from "../utils/images.js";
+import {
+  listNonWidgetImages,
+  listWidgetImages,
+  pickImage,
+  pickImageFromPool,
+} from "../utils/images.js";
 import type { AppDB } from "../db/index.js";
 import type { Config } from "../config.js";
 import type { DisplayResponse } from "../types.js";
+import { listWidgetStates } from "../db/widgets.js";
 
 /** Sent when the device is not recognised – firmware will show an error screen */
 const UNREGISTERED_RESPONSE: Omit<DisplayResponse, "image_url" | "filename"> = {
@@ -15,6 +21,18 @@ const UNREGISTERED_RESPONSE: Omit<DisplayResponse, "image_url" | "filename"> = {
   firmware_url: null,
   special_function: "sleep",
 };
+
+function listEnabledWidgetImages(db: AppDB, imageDir: string): string[] {
+  const widgetImages = listWidgetImages(imageDir);
+  const enabledByName = new Map(
+    listWidgetStates(db).map((row) => [row.name, row.enabled === 1] as const)
+  );
+
+  return widgetImages.filter((filename) => {
+    const name = filename.replace(/^widget-/, "").replace(/\.bmp$/, "");
+    return enabledByName.get(name) ?? true;
+  });
+}
 
 export const displayRoute: FastifyPluginAsync<{ db: AppDB; config: Config }> =
   async (fastify, opts) => {
@@ -44,10 +62,13 @@ export const displayRoute: FastifyPluginAsync<{ db: AppDB; config: Config }> =
 
       const widgetIdx = advanceAndGetWidgetIndex(db, device.mac_address);
 
-      const widgetFiles = listImages(config.imageDir).filter((f) => f.startsWith("widget-"));
-      const pool = widgetFiles.length > 0 ? widgetFiles : listImages(config.imageDir);
-      const filename = pool.length > 0 ? pool[widgetIdx % pool.length] : "default.bmp";
-      const image_url = `${config.baseUrl}/images/${filename}`;
+      const enabledWidgetFiles = listEnabledWidgetImages(db, config.imageDir);
+      const fallbackFiles = listNonWidgetImages(config.imageDir);
+      const { filename, image_url } = pickImageFromPool(
+        config.baseUrl,
+        enabledWidgetFiles.length > 0 ? enabledWidgetFiles : fallbackFiles,
+        widgetIdx
+      );
 
       const body: DisplayResponse = {
         status: 0,

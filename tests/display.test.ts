@@ -8,6 +8,7 @@ import {
   registerDevice,
 } from "./helpers.js";
 import type { AppDB } from "../src/db/index.js";
+import { setWidgetEnabled } from "../src/db/widgets.js";
 
 describe("GET /api/display", () => {
   let app: FastifyInstance;
@@ -198,5 +199,30 @@ describe("GET /api/display", () => {
 
     expect(after).not.toBeNull();
     expect(after).not.toBe(before);
+  });
+
+  it("does not serve disabled widgets to registered devices", async () => {
+    const widgetNames = [
+      "analog-clock",
+      "calendar",
+      "clock",
+      "panel",
+      "photos",
+      "system",
+      "weather",
+    ];
+
+    for (const name of widgetNames) {
+      setWidgetEnabled(db, name, name === "weather");
+    }
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/display",
+      headers: displayHeaders(),
+    });
+
+    const { filename } = res.json<{ filename: string }>();
+    expect(filename).toBe("widget-weather.bmp");
   });
 });

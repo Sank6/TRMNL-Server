@@ -38,6 +38,12 @@ CREATE TABLE IF NOT EXISTS device_logs (
   payload     TEXT NOT NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS widget_states (
+  name        TEXT PRIMARY KEY,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export function openDatabase(path: string): AppDB {

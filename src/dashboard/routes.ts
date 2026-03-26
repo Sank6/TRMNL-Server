@@ -5,7 +5,13 @@ import type { AppDB } from "../db/index.js";
 import type { Config } from "../config.js";
 import { queryRequestLogs, listDeviceLogs } from "../db/logs.js";
 import { listDevices } from "../db/devices.js";
+import { listWidgetStates, setWidgetEnabled } from "../db/widgets.js";
 import { WIDGETS } from "../widgets/index.js";
+import {
+  fetchFittedPhotoPreviewFromCacheOrSource,
+  fetchOriginalPhotoImageFromCacheOrSource,
+  getLastPhotosError,
+} from "../widgets/photos.js";
 import { writeFileSync } from "fs";
 import sharp from "sharp";
 
@@ -40,18 +46,49 @@ export async function dashboardRoutes(
   app.get("/api/widgets", async () => {
     const files = readdirSync(config.imageDir).filter(
       (f) => f.startsWith("widget-") && f.endsWith(".bmp")
+    ).sort();
+    const enabledByName = new Map(
+      listWidgetStates(db).map((row) => [row.name, row.enabled === 1] as const)
     );
+
     return files.map((filename) => {
       const fp = join(config.imageDir, filename);
       const st = statSync(fp);
+      const name = filename.replace(/^widget-/, "").replace(/\.bmp$/, "");
       return {
         filename,
-        name: filename.replace(/^widget-/, "").replace(/\.bmp$/, ""),
+        name,
         size: st.size,
         mtime: st.mtime.toISOString(),
+        enabled: enabledByName.get(name) ?? true,
       };
     });
   });
+
+  app.post<{ Params: { widget: string }; Body: { enabled?: boolean } }>(
+    "/api/widgets/:widget/enabled",
+    async (req, reply) => {
+      const { widget } = req.params;
+      const enabled = req.body?.enabled;
+      const w = WIDGETS.find((candidate) => candidate.name === widget);
+
+      if (!w) {
+        return reply.code(400).send({ error: "unknown widget" });
+      }
+
+      if (typeof enabled !== "boolean") {
+        return reply.code(400).send({ error: "enabled must be a boolean" });
+      }
+
+      const state = setWidgetEnabled(db, widget, enabled);
+      return {
+        ok: true,
+        name: state.name,
+        enabled: state.enabled === 1,
+        updated_at: state.updated_at,
+      };
+    }
+  );
 
   app.get<{ Params: { name: string } }>("/api/widgets/:name.png", async (req, reply) => {
     const { name } = req.params;
@@ -64,7 +101,41 @@ export async function dashboardRoutes(
     }
     const png = await decode1BitBmpToPng(bmpData);
     reply.header("Content-Type", "image/png");
+    reply.header("Cache-Control", "no-store");
     return reply.send(png);
+  });
+
+  app.get("/api/widgets/photos/fitted.png", async (_req, reply) => {
+    try {
+      const preview = await fetchFittedPhotoPreviewFromCacheOrSource(config.imageDir);
+      reply.header("Content-Type", "image/png");
+      reply.header("Cache-Control", "no-store");
+      return reply.send(preview);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unavailable";
+      console.error("[photos]", message);
+      return reply.code(503).send({ error: message });
+    }
+  });
+
+  app.get("/api/widgets/photos/original.png", async (_req, reply) => {
+    try {
+      const original = await fetchOriginalPhotoImageFromCacheOrSource(config.imageDir);
+      const png = await sharp(original).png().toBuffer();
+      reply.header("Content-Type", "image/png");
+      reply.header("Cache-Control", "no-store");
+      return reply.send(png);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unavailable";
+      console.error("[photos]", message);
+      return reply.code(503).send({ error: message });
+    }
+  });
+
+  app.get("/api/widgets/photos/status", async () => {
+    return {
+      error: getLastPhotosError(),
+    };
   });
 
   app.get<{ Params: { filename: string } }>("/api/preview/:filename", async (req, reply) => {
