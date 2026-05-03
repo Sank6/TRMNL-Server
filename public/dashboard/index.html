@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xteink dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    background: #0e0e10;
+    color: #e4e4e7;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  header {
+    background: #18181b;
+    color: #fff;
+    padding: 0 20px;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 1px solid #27272a;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  header .sep { color: #52525b; }
+  header .sub { color: #71717a; font-size: 14px; }
+
+  nav {
+    align-self: stretch;
+    display: flex;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 280px;
+  }
+  nav button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 12px 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: #71717a;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  nav button:hover { color: #e4e4e7; }
+  nav button.active { color: #fff; border-bottom-color: #a1a1aa; }
+  .battery-status {
+    --battery-fill: 0%;
+    position: relative;
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    width: 38px;
+    height: 30px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    color: #e4e4e7;
+    font: inherit;
+    cursor: help;
+    flex-shrink: 0;
+  }
+  .battery-status:hover { background: #27272a; border-color: #52525b; }
+  .topbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    min-height: 46px;
+  }
+  .refresh-rate-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #71717a;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .refresh-rate-control select {
+    height: 30px;
+    min-width: 82px;
+    border: 1px solid #3f3f46;
+    padding: 0 28px 0 9px;
+    background: #18181b;
+    color: #e4e4e7;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+  }
+  .refresh-rate-control select:focus { border-color: #71717a; }
+  .theme-toggle {
+    width: 30px;
+    height: 30px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid #3f3f46;
+    background: #18181b;
+    color: #e4e4e7;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .theme-toggle:hover { background: #27272a; border-color: #52525b; }
+  .battery-icon {
+    position: relative;
+    width: 23px;
+    height: 14px;
+    border: 2px solid currentColor;
+  }
+  .battery-icon::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 3px;
+    width: 3px;
+    height: 6px;
+    background: currentColor;
+  }
+  .battery-fill {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    bottom: 3px;
+    width: var(--battery-fill);
+    max-width: calc(100% - 6px);
+    background: currentColor;
+  }
+  .battery-bolt {
+    position: absolute;
+    inset: -4px 0 0;
+    display: none;
+    place-items: center;
+    color: #09090b;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 800;
+  }
+  .battery-status.battery-low { color: #f87171; }
+  .battery-status.battery-charging .battery-bolt { display: grid; }
+  .battery-status.battery-unknown { color: #71717a; }
+  .battery-tooltip {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    background: #09090b;
+    border: 1px solid #3f3f46;
+    color: #e4e4e7;
+    padding: 5px 7px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(-2px);
+    pointer-events: none;
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .battery-status:hover .battery-tooltip,
+  .battery-status:focus-visible .battery-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (max-width: 760px) {
+    header { padding: 0 14px 6px; }
+    .brand { min-height: 42px; }
+    nav {
+      order: 3;
+      flex-basis: 100%;
+      min-width: 0;
+      overflow-x: auto;
+    }
+    nav button {
+      padding: 10px 12px 8px;
+      white-space: nowrap;
+    }
+    .topbar-controls { min-height: 42px; }
+  }
+
+  main { padding: 14px 20px; width: 100%; }
+
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* ── WIDGETS ─────────────────────────────────────────────────── */
+  .widget-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 1100px) { .widget-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px)  { .widget-grid { grid-template-columns: 1fr; } }
+
+  .widget-card {
+    background: #18181b;
+    border: 1px solid #27272a;
+    padding: 14px;
+  }
+  .widget-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+  .widget-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .widget-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .widget-card img {
+    width: 100%;
+    border: 1px solid #27272a;
+    display: block;
+    background: #09090b;
+  }
+  .widget-card.disabled img {
+    filter: grayscale(1);
+  }
+  .widget-preview-placeholder {
+    width: 100%;
+    aspect-ratio: 800 / 480;
+    border: 1px solid #27272a;
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    background: repeating-linear-gradient(
+      -45deg,
+      #09090b,
+      #09090b 12px,
+      #111114 12px,
+      #111114 24px
+    );
+    color: #71717a;
+    text-align: center;
+    font-size: 13px;
+  }
+  .widget-card.disabled .widget-preview-placeholder {
+    opacity: 0.5;
+  }
+  .widget-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .widget-card-controls {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .widget-meta {
+    margin-top: 7px;
+    color: #71717a;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .btn {
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+    padding: 0 11px;
+    height: 30px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn:hover { background: #3f3f46; border-color: #52525b; }
+  .btn:disabled { background: #18181b; color: #52525b; border-color: #27272a; cursor: not-allowed; }
+  .btn-sm { padding: 0 10px; height: 30px; font-size: 13px; }
+
+  /* ── FILTER BAR ─────────────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .filter-bar input:not([type="checkbox"]),
+  .filter-bar select {
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid #3f3f46;
+    padding: 0 9px;
+    height: 30px;
+    background: #18181b;
+    color: #e4e4e7;
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .filter-bar select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 30px;
+  }
+  .filter-bar input:not([type="checkbox"])::placeholder { color: #52525b; }
+  .filter-bar select option { background: #18181b; }
+  .filter-bar input:not([type="checkbox"]):focus,
+  .filter-bar select:focus { border-color: #71717a; }
+
+  .refresh-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #71717a;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+  .refresh-label input { width: 15px; height: 15px; cursor: pointer; accent-color: #a1a1aa; }
+
+  /* ── TABLE ──────────────────────────────────────────────────── */
+  .table-wrap {
+    background: #18181b;
+    border: 1px solid #27272a;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #18181b;
+    border-bottom: 1px solid #27272a;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #52525b;
+    white-space: nowrap;
+    position: relative;
+    user-select: none;
+    cursor: pointer;
+  }
+  thead th:hover { color: #a1a1aa; }
+  .sort-indicator { margin-left: 5px; font-size: 10px; color: #a1a1aa; }
+  .col-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 3px;
+    cursor: col-resize;
+    transition: background 0.15s;
+  }
+  .col-resize-handle:hover,
+  .col-resize-handle.dragging { background: #52525b; }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: #1c1c1f; }
+  tbody tr + tr td { border-top: 1px solid #27272a; }
+  tbody td {
+    padding: 7px 10px;
+    font-size: 13.5px;
+    vertical-align: middle;
+  }
+  .cell-mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 12.5px; }
+  .cell-dim { color: #71717a; }
+  .truncate { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #27272a;
+    color: #a1a1aa;
+  }
+  .badge-get  { background: #1e3a5f; color: #60a5fa; }
+  .badge-post { background: #14532d; color: #4ade80; }
+  .badge-put  { background: #451a03; color: #fb923c; }
+  .badge-del  { background: #450a0a; color: #f87171; }
+  .badge-enabled { background: #14532d; color: #86efac; }
+  .badge-disabled { background: #3f3f46; color: #d4d4d8; }
+
+  .status-ok   { color: #4ade80; font-weight: 600; }
+  .status-err  { color: #f87171; font-weight: 600; }
+  .status-warn { color: #fb923c; font-weight: 600; }
+
+  /* ── PAGINATION ─────────────────────────────────────────────── */
+  .pagination {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    align-items: center;
+    font-size: 13px;
+    color: #71717a;
+  }
+  .pagination button {
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid #3f3f46;
+    background: #18181b;
+    padding: 0 10px;
+    height: 30px;
+    cursor: pointer;
+    color: #e4e4e7;
+    transition: background 0.15s;
+  }
+  .pagination button:hover:not(:disabled) { background: #27272a; }
+  .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .empty { color: #52525b; padding: 24px; text-align: center; font-size: 13px; }
+
+  /* ── MODAL ───────────────────────────────────────────────────── */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.65);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  #modal {
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    width: min(760px, 92vw);
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #modal.modal-wide {
+    width: min(1240px, 96vw);
+  }
+  #modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #27272a;
+    flex-shrink: 0;
+  }
+  #modal-title { font-size: 14px; font-weight: 600; color: #e4e4e7; }
+  #modal-close {
+    background: none; border: none; color: #71717a; font-size: 16px;
+  }
+  #modal-close:hover { background: #27272a; color: #e4e4e7; }
+  #modal-body {
+    overflow-y: auto; padding: 14px 16px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  #modal-body.modal-single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modal-field { display: flex; flex-direction: column; gap: 4px; }
+  .modal-field.full { grid-column: 1 / -1; }
+  .modal-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #52525b; }
+  .modal-value {
+    font-size: 13px; color: #e4e4e7; word-break: break-all;
+    padding: 6px 8px; white-space: pre-wrap; min-height: 28px;
+  }
+  .modal-value.mono { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 13px; }
+  tbody tr { cursor: pointer; }
+
+  /* ── ALBUM GRID ─────────────────────────────────────────────────── */
+  .album-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    padding: 2px; /* room for outline */
+  }
+  .album-photo {
+    cursor: pointer;
+    border: 2px solid transparent;
+    overflow: hidden;
+    background: #09090b;
+    transition: border-color 0.15s;
+  }
+  .album-photo:hover { border-color: #52525b; }
+  .album-photo.album-current { border-color: #e4e4e7; box-shadow: 0 0 0 1px #e4e4e7; }
+  .album-photo img {
+    width: 100%;
+    display: block;
+    aspect-ratio: 800 / 480;
+    object-fit: cover;
+    background: #09090b;
+  }
+  .album-photo-placeholder {
+    width: 100%;
+    aspect-ratio: 800 / 480;
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    background: repeating-linear-gradient(
+      -45deg,
+      #111114,
+      #111114 10px,
+      #16161a 10px,
+      #16161a 20px
+    );
+    color: #71717a;
+    font-size: 12px;
+    text-align: center;
+  }
+  .album-photo-label {
+    font-size: 12px;
+    color: #71717a;
+    padding: 4px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .album-photo.album-current .album-photo-label { color: #a1a1aa; }
+  .album-note {
+    color: #a1a1aa;
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+
+  /* ── TOGGLE SWITCH ───────────────────────────────────────────────── */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 30px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    top: 3px;
+    background: #52525b;
+    transition: transform 0.15s, background 0.15s;
+  }
+  .toggle-switch input:checked + .toggle-slider {
+    background: #14532d;
+    border-color: #166534;
+  }
+  .toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(22px);
+    background: #4ade80;
+  }
+  .toggle-switch input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── WIDGET SCHEDULE ─────────────────────────────────────────────── */
+  .widget-schedule {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #71717a;
+    flex-wrap: wrap;
+  }
+  .widget-schedule .sched-label { white-space: nowrap; }
+  .time-input {
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid #3f3f46;
+    padding: 0 8px;
+    height: 30px;
+    background: #18181b;
+    color: #e4e4e7;
+    outline: none;
+    width: 96px;
+    cursor: pointer;
+  }
+  .time-input:focus { border-color: #71717a; }
+  .time-input.time-input-scheduled {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 1px #166534;
+  }
+
+  body.light-mode {
+    background: #e7e5e4;
+    color: #27272a;
+  }
+  body.light-mode header,
+  body.light-mode .widget-card,
+  body.light-mode .table-wrap,
+  body.light-mode #modal,
+  body.light-mode .filter-bar input:not([type="checkbox"]),
+  body.light-mode .filter-bar select,
+  body.light-mode .refresh-rate-control select,
+  body.light-mode .time-input,
+  body.light-mode .btn,
+  body.light-mode .pagination button,
+  body.light-mode .theme-toggle {
+    background: #f5f5f4;
+    color: #27272a;
+    border-color: #c7c2bc;
+  }
+  body.light-mode header,
+  body.light-mode thead th,
+  body.light-mode tbody tr + tr td,
+  body.light-mode #modal-header,
+  body.light-mode .widget-card img,
+  body.light-mode .widget-preview-placeholder,
+  body.light-mode .modal-value {
+    border-color: #c7c2bc;
+  }
+  body.light-mode header h1,
+  body.light-mode nav button.active,
+  body.light-mode #modal-title {
+    color: #27272a;
+  }
+  body.light-mode header .sub,
+  body.light-mode header .sep,
+  body.light-mode nav button,
+  body.light-mode .refresh-rate-control,
+  body.light-mode .widget-meta,
+  body.light-mode .refresh-label,
+  body.light-mode .pagination,
+  body.light-mode .cell-dim,
+  body.light-mode .empty,
+  body.light-mode .album-note,
+  body.light-mode .album-photo-label,
+  body.light-mode .modal-label {
+    color: #57534e;
+  }
+  body.light-mode nav button:hover,
+  body.light-mode #modal-close:hover,
+  body.light-mode .btn:hover,
+  body.light-mode .pagination button:hover:not(:disabled),
+  body.light-mode .theme-toggle:hover,
+  body.light-mode .battery-status:hover {
+    background: #ddd6d0;
+    color: #27272a;
+  }
+  body.light-mode nav button.active { border-bottom-color: #44403c; }
+  body.light-mode tbody tr:hover { background: #ece7e2; }
+  body.light-mode thead th { background: #f5f5f4; color: #78716c; }
+  body.light-mode .btn:disabled {
+    background: #e7e5e4;
+    color: #a8a29e;
+    border-color: #d6d3d1;
+  }
+  body.light-mode .modal-value,
+  body.light-mode .widget-card img,
+  body.light-mode .album-photo,
+  body.light-mode .album-photo-placeholder,
+  body.light-mode .widget-preview-placeholder {
+    background: #efedeb;
+  }
+  body.light-mode .badge {
+    background: #ddd6d0;
+    color: #44403c;
+  }
+  body.light-mode .battery-status:not(.battery-low) { color: #27272a; }
+  body.light-mode .battery-status {
+    background: #f5f5f4;
+    border-color: #c7c2bc;
+  }
+  body.light-mode .battery-status.battery-unknown { color: #71717a; }
+  body.light-mode .battery-tooltip {
+    background: #27272a;
+    border-color: #57534e;
+    color: #f5f5f4;
+  }
+  body.light-mode .toggle-slider {
+    background: #ddd6d0;
+    border-color: #a8a29e;
+  }
+  body.light-mode .toggle-slider::before {
+    background: #78716c;
+  }
+  body.light-mode .toggle-switch input:checked + .toggle-slider {
+    background: #d9ead7;
+    border-color: #4d7c0f;
+  }
+  body.light-mode .toggle-switch input:checked + .toggle-slider::before {
+    background: #3f6212;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>xteink</h1>
+    <span class="sep">/</span>
+    <span class="sub">dashboard</span>
+  </div>
+  <nav>
+  <button class="active" onclick="showTab('widgets')">Widgets</button>
+  <button onclick="showTab('logs')">Logs</button>
+  <button onclick="showTab('devices')">Devices</button>
+  <button onclick="showTab('device-logs')">Device Logs</button>
+  </nav>
+  <div class="topbar-controls">
+    <label class="refresh-rate-control" title="Device refresh interval">
+      <select id="refresh-rate-select" onchange="saveRefreshRate(this)">
+        <option value="15">15s</option>
+        <option value="30">30s</option>
+        <option value="60">1m</option>
+        <option value="120">2m</option>
+        <option value="300">5m</option>
+        <option value="600">10m</option>
+        <option value="900">15m</option>
+      </select>
+    </label>
+    <button id="battery-status" class="battery-status battery-unknown" type="button" title="Battery voltage unavailable" aria-label="Battery voltage unavailable">
+      <span class="battery-icon" aria-hidden="true">
+        <span class="battery-fill"></span>
+        <span class="battery-bolt">⚡</span>
+      </span>
+      <span id="battery-tooltip" class="battery-tooltip" role="tooltip">Battery voltage unavailable</span>
+    </button>
+    <button id="theme-toggle" class="theme-toggle" type="button" title="Toggle light mode" aria-label="Toggle light mode" onclick="toggleTheme()">☾</button>
+  </div>
+</header>
+
+<main>
+
+<!-- WIDGETS TAB -->
+<div id="tab-widgets" class="tab active">
+  <div class="widget-grid" id="widget-grid"><p class="empty">Loading…</p></div>
+</div>
+
+<!-- LOGS TAB -->
+<div id="tab-logs" class="tab">
+  <div class="filter-bar">
+    <select id="f-ip" style="width:170px">
+      <option value="">All IPs</option>
+    </select>
+    <input id="f-path" placeholder="Path" style="width:180px">
+    <select id="f-method" style="width:180px">
+      <option value="">All methods</option>
+      <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+    </select>
+    <input id="f-status" placeholder="Status" style="width:90px">
+    <input id="f-q" placeholder="Search…" style="width:180px">
+    <button class="btn btn-sm" onclick="loadLogs(0)">Filter</button>
+    <label class="refresh-label"><input type="checkbox" id="auto-refresh" checked onchange="toggleAutoRefresh()"> <span id="auto-refresh-text">Auto-refresh</span></label>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Time</th><th>IP</th><th>Method</th><th>Path</th><th>Status</th><th>Duration</th>
+      </tr></thead>
+      <tbody id="logs-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button id="logs-prev" onclick="logsPage(-1)" disabled>← Prev</button>
+    <span id="logs-info"></span>
+    <button id="logs-next" onclick="logsPage(1)" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- DEVICES TAB -->
+<div id="tab-devices" class="tab">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>MAC</th><th>Friendly ID</th><th>API Key</th><th>Model</th><th>FW</th><th>Last Seen</th><th>Widget #</th>
+      </tr></thead>
+      <tbody id="devices-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DEVICE LOGS TAB -->
+<div id="tab-device-logs" class="tab">
+  <div class="filter-bar">
+    <input id="f-dlmac" placeholder="Filter by MAC" style="width:180px">
+    <button class="btn btn-sm" onclick="loadDeviceLogs(0)">Filter</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Level</th><th>Log Time</th><th>Received</th><th>MAC</th><th>API Key</th><th>Message</th><th>Source</th>
+      </tr></thead>
+      <tbody id="device-logs-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pagination">
+    <button id="dlogs-prev" onclick="dlogsPage(-1)" disabled>← Prev</button>
+    <span id="dlogs-info"></span>
+    <button id="dlogs-next" onclick="dlogsPage(1)" disabled>Next →</button>
+  </div>
+</div>
+
+</main>
+
+<!-- REQUEST MODAL -->
+<div id="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title"></div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+let logsOffset = 0, logsTotal = 0;
+let dlogsOffset = 0, dlogsTotal = 0;
+const PAGE = 50;
+const LOG_AUTO_REFRESH_INTERVAL_MS = 1000;
+const BATTERY_STATUS_REFRESH_INTERVAL_MS = 30000;
+const BATTERY_LOW_VOLTAGE = 3.2;
+const BATTERY_FULL_VOLTAGE = 4.05;
+let autoRefreshTimer = null;
+let batteryStatusTimer = null;
+let refreshRateSaveInFlight = false;
+const widgetPreviewTimers = new Map();
+const widgetPreviewInFlight = new Set();
+let logsCache = [], devicesCache = [], dlogsCache = [];
+let logsLoadPending = null;
+let logsLoadInFlight = false;
+
+const tableWidths = {};
+
+function makeResizable(tableEl, key) {
+  if (!tableEl) return;
+  const ths = Array.from(tableEl.querySelectorAll('thead th'));
+  if (tableWidths[key]) {
+    tableEl.style.tableLayout = 'fixed';
+    tableWidths[key].forEach((w, i) => { if (ths[i]) ths[i].style.width = w + 'px'; });
+  }
+  ths.forEach(th => {
+    if (th.querySelector('.col-resize-handle')) return;
+    const handle = document.createElement('div');
+    handle.className = 'col-resize-handle';
+    th.appendChild(handle);
+    handle.addEventListener('mousedown', e => {
+      if (tableEl.style.tableLayout !== 'fixed') {
+        const widths = ths.map(t => t.offsetWidth);
+        tableEl.style.tableLayout = 'fixed';
+        ths.forEach((t, i) => t.style.width = widths[i] + 'px');
+      }
+      handle.classList.add('dragging');
+      const startX = e.clientX, startW = th.offsetWidth;
+      const onMove = e => {
+        th.style.width = Math.max(40, startW + e.clientX - startX) + 'px';
+        tableWidths[key] = ths.map(t => t.offsetWidth);
+      };
+      const onUp = () => {
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  });
+}
+
+// ── SORT ─────────────────────────────────────────────────────────────
+const sortState = {
+  logs:    { col: null, dir: -1 },
+  devices: { col: null, dir: -1 },
+  dlogs:   { col: 1,    dir: -1 },
+};
+const sortKeyFns = {
+  logs: [
+    r => r.created_at ?? '',
+    r => r.ip ?? '',
+    r => r.method ?? '',
+    r => r.path ?? '',
+    r => r.status_code ?? 0,
+    r => r.duration_ms ?? 0,
+  ],
+  devices: [
+    d => d.mac_address ?? '',
+    d => d.friendly_id ?? '',
+    d => d.api_key ?? '',
+    d => d.model ?? '',
+    d => d.fw_version ?? '',
+    d => d.last_seen ?? '',
+    d => d.widget_index ?? 0,
+  ],
+  dlogs: [
+    e => { const m = (e.message||'').toLowerCase(); return m.includes('error')||m.includes('failed') ? 0 : m.includes('warn') ? 1 : 2; },
+    e => e.created_at ?? 0,
+    e => e._received ?? '',
+    e => e._mac ?? '',
+    e => e._api_key ?? '',
+    e => e.message ?? '',
+    e => (e.source_path ?? '') + String(e.source_line ?? ''),
+  ],
+};
+
+function applySort(key) {
+  const { col, dir } = sortState[key];
+  if (col === null) return;
+  const cache = { logs: logsCache, devices: devicesCache, dlogs: dlogsCache }[key];
+  const fn = sortKeyFns[key]?.[col];
+  if (!fn) return;
+  cache.sort((a, b) => {
+    const av = fn(a), bv = fn(b);
+    if (av < bv) return -dir;
+    if (av > bv) return dir;
+    return 0;
+  });
+}
+
+function initSortHeaders(tableEl, key, renderFn) {
+  if (!tableEl) return;
+  const ths = Array.from(tableEl.querySelectorAll('thead th'));
+  ths.forEach((th, i) => {
+    if (th._sortBound) return;
+    th._sortBound = true;
+    th.addEventListener('click', e => {
+      if (e.target.classList.contains('col-resize-handle')) return;
+      const s = sortState[key];
+      s.col === i ? (s.dir *= -1) : (s.col = i, s.dir = -1);
+      applySort(key);
+      renderFn();
+      updateSortIndicators(tableEl, key);
+    });
+  });
+  updateSortIndicators(tableEl, key);
+}
+
+function updateSortIndicators(tableEl, key) {
+  const { col, dir } = sortState[key];
+  tableEl.querySelectorAll('thead th').forEach((th, i) => {
+    let ind = th.querySelector('.sort-indicator');
+    if (i === col) {
+      if (!ind) { ind = document.createElement('span'); ind.className = 'sort-indicator'; th.appendChild(ind); }
+      ind.textContent = dir === 1 ? '▲' : '▼';
+    } else if (ind) {
+      ind.remove();
+    }
+  });
+}
+
+function inferLevelBadge(message) {
+  const m = (message || '').toLowerCase();
+  if (m.includes('error') || m.includes('failed')) return '<span class="badge badge-del">error</span>';
+  if (m.includes('warn')) return '<span class="badge badge-put">warn</span>';
+  return '<span class="badge badge-get">info</span>';
+}
+
+function fmtUnix(ts) {
+  return new Date(ts * 1000).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'widgets') loadWidgets();
+  else if (name === 'logs') { loadLogIPs(); loadLogs(0); }
+  else if (name === 'devices') loadDevices();
+  else if (name === 'device-logs') loadDeviceLogs(0);
+}
+
+// ── WIDGETS ──────────────────────────────────────────────────────────
+function renderWidgetPreview(w) {
+  if (w.has_image) {
+    return `<img src="/api/widgets/${w.name}.png?t=${Date.now()}" alt="${esc(w.name)}">`;
+  }
+  return `<div class="widget-preview-placeholder">No generated preview yet</div>`;
+}
+
+function renderWidgetActionButtons(w) {
+  if (!Array.isArray(w.actions) || w.actions.length === 0) return '';
+  return `
+    <div class="widget-card-controls">
+      ${w.actions.map(action => `
+        <button class="btn btn-sm" onclick="runWidgetAction('${esc(w.name)}', '${esc(action.action)}', this)">${esc(action.label)}</button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderWidgetSchedule(w) {
+  const start = w.schedule_start || '';
+  const end   = w.schedule_end   || '';
+  const hasSchedule = Boolean(start && end);
+  return `
+    <div class="widget-schedule" id="sched-${esc(w.name)}">
+      <span class="sched-label">Hours:</span>
+      <input type="time" id="sched-start-${esc(w.name)}" class="time-input${hasSchedule ? ' time-input-scheduled' : ''}" value="${esc(start)}" title="Schedule start">
+      <span>–</span>
+      <input type="time" id="sched-end-${esc(w.name)}" class="time-input${hasSchedule ? ' time-input-scheduled' : ''}" value="${esc(end)}" title="Schedule end">
+      <button class="btn btn-sm" onclick="saveSchedule('${esc(w.name)}', this)" title="Save schedule">Set</button>
+      ${hasSchedule ? `<button class="btn btn-sm" onclick="clearSchedule('${esc(w.name)}', this)" title="Remove schedule">Clear</button>` : ''}
+    </div>
+  `;
+}
+
+function replaceWidgetPreview(card, name, src) {
+  let img = card.querySelector('img');
+  if (!img) {
+    const placeholder = card.querySelector('.widget-preview-placeholder');
+    if (placeholder) {
+      placeholder.outerHTML = `<img src="${src}" alt="${esc(name)}">`;
+      img = card.querySelector('img');
+    }
+  }
+  if (!img) return;
+
+  const prev = img.src;
+  img.src = src;
+  if (card.classList.contains('disabled')) {
+    img.style.filter = 'grayscale(1)';
+  }
+  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+}
+
+function clearWidgetPreviewTimers() {
+  for (const timer of widgetPreviewTimers.values()) {
+    clearInterval(timer);
+  }
+  widgetPreviewTimers.clear();
+}
+
+async function refreshWidgetPreview(name) {
+  const card = document.getElementById('card-' + name);
+  if (!card) return;
+  try {
+    const res = await fetch(`/api/widgets/${name}.png?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    replaceWidgetPreview(card, name, URL.createObjectURL(blob));
+  } catch {}
+}
+
+async function regenerateWidgetForPreview(name) {
+  const res = await fetch('/api/regenerate/' + name, { method: 'POST' });
+  return res.ok;
+}
+
+async function runWidgetPreviewRefresh(widget) {
+  const card = document.getElementById('card-' + widget.name);
+  if (!card || card.classList.contains('disabled')) return;
+  if (widgetPreviewInFlight.has(widget.name)) return;
+
+  widgetPreviewInFlight.add(widget.name);
+  try {
+    if (widget.preview_refresh_mode === 'regenerate') {
+      const regenerated = await regenerateWidgetForPreview(widget.name);
+      if (!regenerated) return;
+    }
+    await refreshWidgetPreview(widget.name);
+  } finally {
+    widgetPreviewInFlight.delete(widget.name);
+  }
+}
+
+function syncWidgetPreviewAutoRefresh(widgets) {
+  clearWidgetPreviewTimers();
+  for (const widget of widgets) {
+    if (!Number.isInteger(widget.preview_refresh_ms) || widget.preview_refresh_ms <= 0) continue;
+    const timer = setInterval(() => {
+      if (!document.getElementById('tab-widgets')?.classList.contains('active')) return;
+      void runWidgetPreviewRefresh(widget);
+    }, widget.preview_refresh_ms);
+    widgetPreviewTimers.set(widget.name, timer);
+  }
+}
+
+async function loadWidgets() {
+  const grid = document.getElementById('widget-grid');
+  try {
+    const data = await fetch('/api/widgets').then(r => r.json());
+    if (!data.length) {
+      clearWidgetPreviewTimers();
+      grid.innerHTML = '<p class="empty">No widgets found.</p>';
+      return;
+    }
+    grid.innerHTML = data.map(w => `
+      <div class="widget-card${w.enabled ? '' : ' disabled'}" id="card-${w.name}" data-enabled="${w.enabled}">
+        <div class="widget-card-header">
+          <div class="widget-card-title">
+            <h3>${w.name}</h3>
+          </div>
+          <div class="widget-actions">
+            <label class="toggle-switch" title="${w.enabled ? 'Disable widget' : 'Enable widget'}">
+              <input type="checkbox" ${w.enabled ? 'checked' : ''} onchange="toggleWidget('${w.name}', this.checked, this)">
+              <span class="toggle-slider"></span>
+            </label>
+            <button class="btn btn-sm" onclick="regenerate('${w.name}', this)">Regenerate</button>
+          </div>
+        </div>
+        ${renderWidgetPreview(w)}
+        <div class="widget-meta">
+          <span>${w.size != null ? (w.size / 1024).toFixed(1) + ' KB' : '—'}</span>
+          <span>${w.mtime ? fmtTime(w.mtime) : 'Not generated'}</span>
+        </div>
+        ${renderWidgetSchedule(w)}
+        ${renderWidgetActionButtons(w)}
+      </div>
+    `).join('');
+    syncWidgetPreviewAutoRefresh(data);
+  } catch {
+    clearWidgetPreviewTimers();
+    grid.innerHTML = '<p class="empty">Failed to load widgets.</p>';
+  }
+}
+
+async function toggleWidget(name, enabled, checkbox) {
+  checkbox.disabled = true;
+  try {
+    const res = await fetch('/api/widgets/' + name + '/enabled', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('toggle failed');
+    const card = document.getElementById('card-' + name);
+    if (card) {
+      card.classList.toggle('disabled', !enabled);
+      const img = card.querySelector('img');
+      if (img) {
+        img.style.filter = enabled ? '' : 'grayscale(1)';
+      }
+    }
+  } catch {
+    checkbox.checked = !enabled;
+  }
+  checkbox.disabled = false;
+}
+
+async function saveSchedule(name, btn) {
+  const start = document.getElementById('sched-start-' + name)?.value || null;
+  const end   = document.getElementById('sched-end-'   + name)?.value || null;
+  if (Boolean(start) !== Boolean(end)) {
+    alert('Set both start and end times, or leave both empty to remove the schedule.');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await fetch('/api/widgets/' + name + '/schedule', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ schedule_start: start, schedule_end: end }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || 'Failed');
+    }
+    btn.textContent = 'Saved';
+    setTimeout(async () => { btn.textContent = 'Set'; btn.disabled = false; await loadWidgets(); }, 900);
+  } catch (err) {
+    btn.textContent = 'Error';
+    btn.title = err instanceof Error ? err.message : '';
+    setTimeout(() => { btn.textContent = 'Set'; btn.disabled = false; btn.title = ''; }, 2500);
+  }
+}
+
+async function clearSchedule(name, btn) {
+  btn.disabled = true;
+  try {
+    await fetch('/api/widgets/' + name + '/schedule', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ schedule_start: null, schedule_end: null }),
+    });
+    await loadWidgets();
+  } catch {
+    btn.disabled = false;
+  }
+}
+
+async function runWidgetAction(name, action, btn) {
+  const handlers = {
+    'photos:view-album': () => openAlbumModal(),
+    'photos:update-album': () => updateAlbum(btn),
+  };
+  const handler = handlers[action];
+  if (!handler) return;
+  await handler(name, btn);
+}
+
+function getJsonErrorMessage(payload) {
+  if (!payload || typeof payload !== 'object') return '';
+  if (typeof payload.error === 'string' && payload.error.trim()) return payload.error.trim();
+  if (typeof payload.message === 'string' && payload.message.trim()) return payload.message.trim();
+  return '';
+}
+
+async function parseJsonResponse(res, context) {
+  const text = await res.text();
+  let payload = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error(`${context} returned invalid JSON (HTTP ${res.status})`);
+    }
+  }
+  if (!res.ok) {
+    throw new Error(getJsonErrorMessage(payload) || `${context} failed with HTTP ${res.status}`);
+  }
+  return payload;
+}
+
+function getErrorMessage(error, fallback) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+async function openAlbumModal() {
+  showModal('Photos Album', '<p class="empty" style="padding:24px">Loading album…</p>', { wide: true, singleColumn: true });
+  try {
+    const { photos, total, currentIndex, cached } = await parseJsonResponse(
+      await fetch('/api/widgets/photos/album'),
+      'Load album'
+    );
+    const cacheBust = Date.now();
+    const body = document.getElementById('modal-body');
+    if (!photos.length) {
+      body.innerHTML = `<p class="empty" style="padding:24px">No photos cached yet — click <strong>Update Album</strong> to fetch the album first.</p>`;
+      return;
+    }
+    const cacheNote = `<p class="album-note">${cached}/${total} thumbnails cached locally. Selecting a photo still works even if its thumbnail is not cached.</p>`;
+    body.innerHTML = `${cacheNote}<div class="album-grid">${photos.map(p => `
+      <div class="album-photo${p.index === currentIndex ? ' album-current' : ''}" onclick="jumpToPhoto(${p.index})" title="${esc(p.caption)}${p.date ? ' · ' + esc(p.date) : ''}">
+        ${p.cached
+          ? `<img src="/api/widgets/photos/album/${p.index}.png?t=${cacheBust}" alt="${esc(p.caption || 'Photo ' + (p.index + 1))}">`
+          : `<div class="album-photo-placeholder">Thumbnail not cached yet</div>`}
+        <div class="album-photo-label">${p.index + 1} of ${total}${p.caption ? ' · ' + esc(p.caption) : ''}${p.date ? ' · ' + esc(p.date) : ''}</div>
+      </div>`).join('')}</div>`;
+    document.querySelector('.album-current')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  } catch (error) {
+    console.error('[dashboard] photos:view-album failed:', getErrorMessage(error, 'Failed to load album'), error);
+    document.getElementById('modal-body').innerHTML = '<p class="empty" style="padding:24px">Failed to load album.</p>';
+  }
+}
+
+let prefetchPollTimer = null;
+function clearAlbumPrefetchPoll() {
+  clearInterval(prefetchPollTimer);
+  prefetchPollTimer = null;
+}
+
+function restoreUpdateAlbumButton(btn, delay = 0) {
+  const reset = () => {
+    btn.textContent = 'Update Album';
+    btn.disabled = false;
+    btn.title = '';
+  };
+  if (delay > 0) {
+    setTimeout(reset, delay);
+    return;
+  }
+  reset();
+}
+
+function handleAlbumUpdateError(btn, error) {
+  const message = getErrorMessage(error, 'Album update failed');
+  clearAlbumPrefetchPoll();
+  console.error('[dashboard] photos:update-album failed:', message, error);
+  btn.textContent = 'Error';
+  btn.title = message;
+  restoreUpdateAlbumButton(btn, 3000);
+}
+
+async function updateAlbum(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    const startStatus = await parseJsonResponse(
+      await fetch('/api/widgets/photos/album/prefetch', { method: 'POST' }),
+      'Start album prefetch'
+    );
+    if (startStatus.status === 'error') {
+      throw new Error(startStatus.error || 'Album prefetch failed');
+    }
+    console.info('[dashboard] photos:update-album started');
+    clearAlbumPrefetchPoll();
+    prefetchPollTimer = setInterval(async () => {
+      try {
+        const { status, total, done, error } = await parseJsonResponse(
+          await fetch('/api/widgets/photos/album/prefetch/status'),
+          'Poll album prefetch status'
+        );
+        if (status === 'running') {
+          btn.textContent = `${done}/${total} photos…`;
+        } else {
+          clearAlbumPrefetchPoll();
+          if (status === 'done') {
+            console.info('[dashboard] photos:update-album completed:', { done, total });
+            btn.textContent = `${done} photos cached`;
+            restoreUpdateAlbumButton(btn, 2500);
+          } else if (status === 'error') {
+            handleAlbumUpdateError(btn, new Error(error || 'Album prefetch failed'));
+          } else {
+            btn.textContent = 'Starting…';
+          }
+        }
+      } catch (error) {
+        handleAlbumUpdateError(btn, error);
+      }
+    }, 1000);
+  } catch (error) {
+    handleAlbumUpdateError(btn, error);
+  }
+}
+
+async function jumpToPhoto(index) {
+  const clicked = document.querySelector(`.album-photo:nth-child(${index + 1})`);
+  if (clicked) clicked.style.opacity = '0.5';
+  try {
+    const res = await fetch('/api/widgets/photos/index', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ index }),
+    });
+    if (!res.ok) throw new Error('Failed');
+    closeModal();
+    await loadWidgets();
+  } catch {
+    if (clicked) clicked.style.opacity = '';
+  }
+}
+
+async function regenerate(name, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await fetch('/api/regenerate/' + name, { method: 'POST' });
+    if (!res.ok) { btn.textContent = 'Error'; btn.disabled = false; return; }
+    const card = document.getElementById('card-' + name);
+    // Fetch via the Fetch API so cache:'no-store' is honoured, then swap via blob URL
+    const blob = await fetch(`/api/widgets/${name}.png?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.blob());
+    replaceWidgetPreview(card, name, URL.createObjectURL(blob));
+    btn.textContent = 'Done';
+    setTimeout(() => { btn.textContent = 'Regenerate'; btn.disabled = false; }, 1500);
+  } catch {
+    btn.textContent = 'Error'; btn.disabled = false;
+  }
+}
+
+// ── LOGS ─────────────────────────────────────────────────────────────
+async function loadLogIPs() {
+  try {
+    const ips = await fetch('/api/logs/ips').then(r => r.json());
+    const sel = document.getElementById('f-ip');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All IPs</option>' +
+      ips.map(ip => `<option${ip === current ? ' selected' : ''}>${esc(ip)}</option>`).join('');
+  } catch {}
+}
+
+function renderLogsBody() {
+  const tbody = document.getElementById('logs-body');
+  if (!logsCache.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No logs found.</td></tr>'; return; }
+  tbody.innerHTML = logsCache.map(r => `
+    <tr onclick="openModal(${r.id})">
+      <td class="cell-mono cell-dim" style="white-space:nowrap">${fmtTime(r.created_at)}</td>
+      <td class="cell-mono">${r.ip ?? ''}</td>
+      <td><span class="badge badge-${(r.method||'').toLowerCase()}">${r.method}</span></td>
+      <td class="cell-mono truncate" title="${esc(r.path)}">${esc(r.path)}</td>
+      <td class="${statusClass(r.status_code)}">${r.status_code ?? ''}</td>
+      <td class="cell-dim">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadLogs(offset) {
+  logsLoadPending = offset;
+  if (logsLoadInFlight) return;
+
+  logsLoadInFlight = true;
+  try {
+    while (logsLoadPending !== null) {
+      const nextOffset = logsLoadPending;
+      logsLoadPending = null;
+      logsOffset = nextOffset;
+
+      const params = new URLSearchParams({
+        limit: PAGE, offset: nextOffset,
+        ip: v('f-ip'), path: v('f-path'), method: v('f-method'),
+        status: v('f-status'), q: v('f-q'),
+      });
+      let total = 0;
+      try {
+        const res = await fetch('/api/logs?' + params).then(r => r.json());
+        logsCache = res.rows;
+        total = res.total;
+        applySort('logs');
+        renderLogsBody();
+      } catch {
+        document.getElementById('logs-body').innerHTML = '<tr><td colspan="6" class="empty">Error loading logs.</td></tr>';
+      }
+      updatePager('logs', nextOffset, total);
+      const tableEl = document.querySelector('#tab-logs table');
+      makeResizable(tableEl, 'logs');
+      initSortHeaders(tableEl, 'logs', renderLogsBody);
+    }
+  } finally {
+    logsLoadInFlight = false;
+  }
+}
+
+function logsPage(dir) { loadLogs(Math.max(0, logsOffset + dir * PAGE)); }
+
+// ── MODAL ─────────────────────────────────────────────────────────────
+function showModal(title, bodyHtml, options = {}) {
+  const modal = document.getElementById('modal');
+  const body = document.getElementById('modal-body');
+  document.getElementById('modal-title').innerHTML = title;
+  body.innerHTML = bodyHtml;
+  modal.classList.toggle('modal-wide', Boolean(options.wide));
+  body.classList.toggle('modal-single', Boolean(options.singleColumn));
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function field(label, value, full = false, mono = false) {
+  return `<div class="modal-field${full ? ' full' : ''}">
+    <div class="modal-label">${label}</div>
+    <div class="modal-value${mono ? ' mono' : ''}">${value ?? '<span style="color:#52525b">—</span>'}</div>
+  </div>`;
+}
+
+function fmtJson(val) {
+  if (val == null) return '<span style="color:#52525b">—</span>';
+  try { return esc(JSON.stringify(JSON.parse(val), null, 2)); } catch { return esc(String(val)); }
+}
+
+function openModal(id) {
+  const row = logsCache.find(r => r.id === id);
+  if (!row) return;
+  const title = `<span class="badge badge-${(row.method||'').toLowerCase()}">${row.method}</span>
+    <span style="margin-left:10px;font-family:monospace">${esc(row.path)}</span>`;
+  showModal(title,
+    field('Time', fmtTime(row.created_at), false, true) +
+    field('IP', row.ip, false, true) +
+    `<div class="modal-field"><div class="modal-label">Status</div>
+      <div class="modal-value mono ${statusClass(row.status_code)}">${row.status_code ?? '—'}</div></div>` +
+    field('Duration', row.duration_ms != null ? row.duration_ms + ' ms' : null, false, true) +
+    field('Headers', fmtJson(row.headers), true, true) +
+    field('Request Body', fmtJson(row.body), true, true) +
+    field('Response', fmtJson(row.response), true, true)
+  );
+}
+
+function openDeviceModal(i) {
+  const d = devicesCache[i];
+  if (!d) return;
+  showModal(`<span style="font-family:monospace">${d.mac_address}</span> &nbsp;<span style="color:#71717a;font-size:14px">${d.friendly_id}</span>`,
+    field('MAC Address', d.mac_address, false, true) +
+    field('Friendly ID', d.friendly_id, false, true) +
+    field('API Key', d.api_key, true, true) +
+    field('Model', d.model) +
+    field('Firmware', d.fw_version) +
+    field('Refresh Rate', d.refresh_rate + ' s') +
+    field('Widget Index', String(d.widget_index)) +
+    field('Created', fmtTime(d.created_at)) +
+    field('Last Seen', d.last_seen ? fmtTime(d.last_seen) : null)
+  );
+}
+
+function openDeviceLogModal(i) {
+  const e = dlogsCache[i];
+  if (!e) return;
+  showModal(`${inferLevelBadge(e.message)} &nbsp;<span style="color:#71717a;font-size:14px;font-family:monospace">${esc(e._mac ?? '—')}</span>`,
+    field('Message', esc(e.message ?? '—'), true) +
+    field('Log Time', e.created_at ? fmtUnix(e.created_at) : null, false, true) +
+    field('Received', fmtTime(e._received), false, true) +
+    field('MAC Address', e._mac, false, true) +
+    field('API Key', e._api_key, true, true) +
+    field('Source', e.source_path ? esc(e.source_path) + ':' + e.source_line : null, true, true) +
+    field('Firmware', e.firmware_version) +
+    field('Wake Reason', e.wake_reason) +
+    field('Battery', e.battery_voltage != null ? e.battery_voltage + ' V' : null) +
+    field('WiFi Signal', e.wifi_signal != null ? e.wifi_signal + ' dBm' : null) +
+    field('WiFi Status', e.wifi_status) +
+    field('Free Heap', e.free_heap_size != null ? (e.free_heap_size / 1024).toFixed(1) + ' KB' : null) +
+    field('Refresh Rate', e.refresh_rate != null ? e.refresh_rate + ' s' : null) +
+    field('Retry', e.retry != null ? String(e.retry) : null)
+  );
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay') && e.target !== document.getElementById('modal-close')) return;
+  document.getElementById('modal').classList.remove('modal-wide');
+  document.getElementById('modal-body').classList.remove('modal-single');
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── DEVICES ──────────────────────────────────────────────────────────
+function renderDevicesBody() {
+  const tbody = document.getElementById('devices-body');
+  if (!devicesCache.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No devices registered.</td></tr>'; return; }
+  tbody.innerHTML = devicesCache.map((d, i) => `
+    <tr style="cursor:pointer" onclick="openDeviceModal(${i})">
+      <td class="cell-mono">${d.mac_address}</td>
+      <td>${d.friendly_id}</td>
+      <td class="cell-mono">${esc(d.api_key)}</td>
+      <td>${d.model ?? '<span class="cell-dim">—</span>'}</td>
+      <td>${d.fw_version ?? '<span class="cell-dim">—</span>'}</td>
+      <td class="cell-dim">${d.last_seen ? fmtTime(d.last_seen) : '—'}</td>
+      <td>${d.widget_index}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadDevices() {
+  try {
+    const data = await fetch('/api/devices').then(r => r.json());
+    devicesCache = data;
+    applySort('devices');
+    renderDevicesBody();
+  } catch { document.getElementById('devices-body').innerHTML = '<tr><td colspan="7" class="empty">Error loading devices.</td></tr>'; }
+  const tableEl = document.querySelector('#tab-devices table');
+  makeResizable(tableEl, 'devices');
+  initSortHeaders(tableEl, 'devices', renderDevicesBody);
+}
+
+// ── DEVICE LOGS ───────────────────────────────────────────────────────
+function renderDlogsBody() {
+  const tbody = document.getElementById('device-logs-body');
+  if (!dlogsCache.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No device logs.</td></tr>'; return; }
+  tbody.innerHTML = dlogsCache.map((e, i) => {
+    const src = e.source_path ? esc(e.source_path.split('/').pop()) + ':' + e.source_line : '';
+    return `<tr style="cursor:pointer" onclick="openDeviceLogModal(${i})">
+      <td>${inferLevelBadge(e.message)}</td>
+      <td class="cell-mono cell-dim" style="white-space:nowrap">${e.created_at ? fmtUnix(e.created_at) : '—'}</td>
+      <td class="cell-mono cell-dim" style="white-space:nowrap">${fmtTime(e._received)}</td>
+      <td class="cell-mono">${esc(e._mac ?? '')}</td>
+      <td class="cell-mono">${esc(e._api_key ?? '')}</td>
+      <td class="truncate" title="${esc(e.message ?? '')}">${esc(e.message ?? '')}</td>
+      <td class="cell-mono cell-dim truncate" title="${esc(e.source_path ?? '')}">${src}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadDeviceLogs(offset) {
+  dlogsOffset = offset;
+  const params = new URLSearchParams({ limit: PAGE, offset, mac: v('f-dlmac') });
+  let total = 0;
+  try {
+    const { rows, total: t } = await fetch('/api/device-logs?' + params).then(r => r.json());
+    total = t;
+    dlogsTotal = t;
+    const entries = [];
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.payload);
+        const logs = Array.isArray(parsed.logs) ? parsed.logs : [parsed];
+        for (const entry of logs) {
+          entries.push({ ...entry, _mac: row.mac_address, _api_key: row.api_key, _received: row.created_at });
+        }
+      } catch {
+        entries.push({ message: row.payload, _mac: row.mac_address, _api_key: row.api_key, _received: row.created_at });
+      }
+    }
+    dlogsCache = entries;
+    applySort('dlogs');
+    renderDlogsBody();
+  } catch { document.getElementById('device-logs-body').innerHTML = '<tr><td colspan="7" class="empty">Error loading device logs.</td></tr>'; }
+  updatePager('dlogs', offset, total);
+  const tableEl = document.querySelector('#tab-device-logs table');
+  makeResizable(tableEl, 'dlogs');
+  initSortHeaders(tableEl, 'dlogs', renderDlogsBody);
+}
+
+function dlogsPage(dir) { loadDeviceLogs(Math.max(0, dlogsOffset + dir * PAGE)); }
+
+// ── THEME ────────────────────────────────────────────────────────────
+function setThemeMode(mode) {
+  const light = mode === 'light';
+  document.body.classList.toggle('light-mode', light);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = light ? '☀' : '☾';
+    btn.title = light ? 'Use dark mode' : 'Use light mode';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  localStorage.setItem('dashboard-theme', light ? 'light' : 'dark');
+}
+
+function toggleTheme() {
+  setThemeMode(document.body.classList.contains('light-mode') ? 'dark' : 'light');
+}
+
+// ── REFRESH RATE ─────────────────────────────────────────────────────
+function formatRefreshRateLabel(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds % 60 === 0) return `${seconds / 60}m`;
+  return `${seconds}s`;
+}
+
+function ensureRefreshRateOption(select, seconds) {
+  if (!select || !Number.isInteger(seconds) || seconds <= 0) return;
+  if (Array.from(select.options).some(option => Number(option.value) === seconds)) return;
+
+  const option = document.createElement('option');
+  option.value = String(seconds);
+  option.textContent = formatRefreshRateLabel(seconds);
+  select.appendChild(option);
+}
+
+function applyRefreshRateConfig(config) {
+  const select = document.getElementById('refresh-rate-select');
+  const seconds = Number(config?.refresh_rate_seconds);
+  if (!select || !Number.isInteger(seconds) || seconds <= 0) return;
+
+  ensureRefreshRateOption(select, seconds);
+  select.value = String(seconds);
+  select.title = `Device refresh interval: ${formatRefreshRateLabel(seconds)}`;
+  if (config.refresh_rate_updated_at) {
+    select.title += ` · saved ${config.refresh_rate_updated_at}`;
+  }
+}
+
+async function loadRefreshRateConfig() {
+  try {
+    applyRefreshRateConfig(await fetch('/api/config').then(r => r.json()));
+  } catch {}
+}
+
+async function saveRefreshRate(select) {
+  if (refreshRateSaveInFlight) return;
+  const refreshRateSeconds = Number.parseInt(select.value, 10);
+  if (!Number.isInteger(refreshRateSeconds) || refreshRateSeconds <= 0) {
+    await loadRefreshRateConfig();
+    return;
+  }
+
+  refreshRateSaveInFlight = true;
+  select.disabled = true;
+  try {
+    const res = await fetch('/api/config/refresh-rate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_rate_seconds: refreshRateSeconds }),
+    });
+    if (!res.ok) throw new Error('Failed to update refresh rate');
+    applyRefreshRateConfig(await res.json());
+    if (document.getElementById('tab-widgets')?.classList.contains('active')) {
+      await loadWidgets();
+    }
+  } catch {
+    await loadRefreshRateConfig();
+  } finally {
+    select.disabled = false;
+    refreshRateSaveInFlight = false;
+  }
+}
+
+// ── BATTERY ──────────────────────────────────────────────────────────
+function parseBatteryHeader(row) {
+  if (!row?.headers) return null;
+  try {
+    const headers = JSON.parse(row.headers);
+    const voltage = Number.parseFloat(headers['battery-voltage']);
+    if (!Number.isFinite(voltage)) return null;
+    return {
+      voltage,
+      rssi: headers.rssi,
+      refreshRate: headers['refresh-rate'],
+      createdAt: row.created_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function batteryFillPercent(voltage) {
+  return Math.max(8, Math.min(100, ((voltage - 3.0) / 1.2) * 100));
+}
+
+function updateBatteryIcon(readings) {
+  const el = document.getElementById('battery-status');
+  const tooltip = document.getElementById('battery-tooltip');
+  if (!el) return;
+
+  const latest = readings[0] ?? null;
+  if (!latest) {
+    el.className = 'battery-status battery-unknown';
+    el.style.setProperty('--battery-fill', '0%');
+    el.title = 'Battery voltage unavailable';
+    el.setAttribute('aria-label', 'Battery voltage unavailable');
+    if (tooltip) tooltip.textContent = 'Battery voltage unavailable';
+    return;
+  }
+
+  const previous = readings.find((reading) => reading.createdAt !== latest.createdAt) ?? null;
+  const isLow = latest.voltage < BATTERY_LOW_VOLTAGE;
+  const isFull = latest.voltage >= BATTERY_FULL_VOLTAGE;
+  const isCharging = !isFull && previous && latest.voltage - previous.voltage >= 0.03;
+  const state = isLow ? 'low' : isFull ? 'charged' : isCharging ? 'charging' : 'normal';
+  const title = `${latest.voltage.toFixed(2)}V`;
+
+  el.className = [
+    'battery-status',
+    isLow ? 'battery-low' : '',
+    isCharging ? 'battery-charging' : '',
+    isFull ? 'battery-full' : '',
+  ].filter(Boolean).join(' ');
+  el.style.setProperty('--battery-fill', `${(isFull ? 100 : batteryFillPercent(latest.voltage)).toFixed(0)}%`);
+  el.title = title;
+  el.setAttribute('aria-label', title);
+  if (tooltip) tooltip.textContent = title;
+}
+
+async function loadBatteryStatus() {
+  try {
+    const params = new URLSearchParams({ limit: 8, offset: 0, path: '/api/display' });
+    const { rows } = await fetch('/api/logs?' + params).then(r => r.json());
+    updateBatteryIcon((rows ?? []).map(parseBatteryHeader).filter(Boolean));
+  } catch {
+    updateBatteryIcon([]);
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function v(id) { return document.getElementById(id)?.value?.trim() ?? ''; }
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+function statusClass(code) {
+  if (!code) return '';
+  const s = String(code)[0];
+  return s === '2' ? 'status-ok' : s === '4' ? 'status-warn' : s === '5' ? 'status-err' : '';
+}
+
+function updatePager(prefix, offset, total) {
+  document.getElementById(prefix + '-prev').disabled = offset === 0;
+  document.getElementById(prefix + '-next').disabled = offset + PAGE >= total;
+  const from = total === 0 ? 0 : offset + 1;
+  document.getElementById(prefix + '-info').textContent =
+    `${from}–${Math.min(offset + PAGE, total)} of ${total}`;
+}
+
+function toggleAutoRefresh() {
+  clearInterval(autoRefreshTimer);
+  autoRefreshTimer = null;
+  if (document.getElementById('auto-refresh').checked) {
+    autoRefreshTimer = setInterval(() => {
+      if (!document.getElementById('tab-logs')?.classList.contains('active')) return;
+      void loadLogs(logsOffset);
+    }, LOG_AUTO_REFRESH_INTERVAL_MS);
+  }
+}
+
+async function initDashboard() {
+  setThemeMode(localStorage.getItem('dashboard-theme') === 'light' ? 'light' : 'dark');
+  loadWidgets();
+  loadLogIPs();
+  await loadRefreshRateConfig();
+  await loadBatteryStatus();
+  clearInterval(batteryStatusTimer);
+  batteryStatusTimer = setInterval(loadBatteryStatus, BATTERY_STATUS_REFRESH_INTERVAL_MS);
+  await loadLogs(0);
+  toggleAutoRefresh();
+}
+
+void initDashboard();
+</script>
+</body>
+</html>
