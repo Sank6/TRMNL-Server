@@ -6,8 +6,23 @@ import { buildApp } from "./app.js";
 import { buildDashboard } from "./dashboard/server.js";
 import { Bonjour } from "bonjour-service";
 import { startWidgets } from "./widgets/index.js";
+import { detectLocation } from "./utils/geolocation.js";
 
 const config = loadConfig();
+
+if (config.weatherLat == null || config.weatherLon == null) {
+  const loc = await detectLocation();
+  if (loc) {
+    config.weatherLat = loc.lat;
+    config.weatherLon = loc.lon;
+    if (!config.weatherLocation) config.weatherLocation = loc.city;
+  } else {
+    console.warn("  ⚠  Could not auto-detect location — set WEATHER_LAT / WEATHER_LON in .env");
+    config.weatherLat = 51.5074;
+    config.weatherLon = -0.1278;
+    if (!config.weatherLocation) config.weatherLocation = "London";
+  }
+}
 
 // Ensure DB directory exists
 mkdirSync(dirname(config.dbPath), { recursive: true });

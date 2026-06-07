@@ -11,10 +11,11 @@ export interface Config {
   refreshRateSeconds: number;
   refreshRateMs: number;
   logLevel: string;
-  weatherLat: number;
-  weatherLon: number;
+  weatherLat: number | null;
+  weatherLon: number | null;
   weatherLocation: string;
   dashboardPort: number;
+  googlePollenApiKey: string | null;
 }
 
 function parseRequiredPositiveInt(name: string, value: string | undefined): number {
@@ -41,9 +42,10 @@ export function loadConfig(): Config {
     refreshRateSeconds,
     refreshRateMs: refreshRateSeconds * MS_PER_SECOND,
     logLevel: process.env.LOG_LEVEL ?? "info",
-    weatherLat: parseFloat(process.env.WEATHER_LAT ?? "51.5074"),
-    weatherLon: parseFloat(process.env.WEATHER_LON ?? "-0.1278"),
-    weatherLocation: process.env.WEATHER_LOCATION ?? "London",
+    weatherLat: process.env.WEATHER_LAT ? parseFloat(process.env.WEATHER_LAT) : null,
+    weatherLon: process.env.WEATHER_LON ? parseFloat(process.env.WEATHER_LON) : null,
+    weatherLocation: process.env.WEATHER_LOCATION ?? "",
     dashboardPort: parseInt(process.env.DASHBOARD_PORT ?? "3001", 10),
+    googlePollenApiKey: process.env.GOOGLE_POLLEN_API_KEY ?? null,
   };
 }

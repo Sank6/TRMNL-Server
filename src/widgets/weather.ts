@@ -25,27 +25,16 @@ interface WeatherData {
   hourly: HourlyEntry[];
 }
 
-interface PollenData {
-  treePollen: number | null;
-  grassPollen: number | null;
-  uvIndex: number | null;
+interface PollenEntry {
+  value: number;
+  category: string;
 }
 
-// ── WMO → description ────────────────────────────────────────────────────────
-
-const WMO_DESC: Record<number, string> = {
-  0: "Clear Sky", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast",
-  45: "Fog", 48: "Icy Fog",
-  51: "Light Drizzle", 53: "Drizzle", 55: "Heavy Drizzle",
-  61: "Light Rain", 63: "Rain", 65: "Heavy Rain",
-  71: "Light Snow", 73: "Snow", 75: "Heavy Snow", 77: "Snow Grains",
-  80: "Rain Showers", 81: "Rain Showers", 82: "Heavy Showers",
-  85: "Snow Showers", 86: "Heavy Snow Showers",
-  95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm",
-};
-
-function weatherDescription(code: number): string {
-  return WMO_DESC[code] ?? "Unknown";
+interface PollenData {
+  treePollen: PollenEntry | null;
+  grassPollen: PollenEntry | null;
+  weedPollen: PollenEntry | null;
+  uvIndex: number | null;
 }
 
 // ── WMO → external SVG icon ─────────────────────────────────────────────────
@@ -169,6 +158,38 @@ function fallbackIconSvg(code: number): string {
   return cloud;
 }
 
+// ── Pollen icons ─────────────────────────────────────────────────────────────
+
+function pollenTreeIconSvg(): string {
+  return `
+    <polygon points="0,-32 -20,0 20,0" fill="black"/>
+    <polygon points="0,-50 -14,-14 14,-14" fill="black"/>
+    <rect x="-5" y="0" width="10" height="14" fill="black"/>
+  `;
+}
+
+function pollenGrassIconSvg(): string {
+  return `
+    <line x1="-18" y1="14" x2="-24" y2="-34" stroke="black" stroke-width="8" stroke-linecap="round"/>
+    <line x1="0" y1="14" x2="0" y2="-46" stroke="black" stroke-width="8" stroke-linecap="round"/>
+    <line x1="18" y1="14" x2="24" y2="-34" stroke="black" stroke-width="8" stroke-linecap="round"/>
+  `;
+}
+
+function pollenWeedIconSvg(): string {
+  return `
+    <circle r="8" fill="black"/>
+    <line x1="0" y1="-10" x2="0" y2="-30" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="0" y1="10" x2="0" y2="30" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-10" y1="0" x2="-30" y2="0" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="10" y1="0" x2="30" y2="0" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-7" y1="-7" x2="-21" y2="-21" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="7" y1="-7" x2="21" y2="-21" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="7" y1="7" x2="21" y2="21" stroke="black" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-7" y1="7" x2="-21" y2="21" stroke="black" stroke-width="7" stroke-linecap="round"/>
+  `;
+}
+
 // ── Weather API ──────────────────────────────────────────────────────────────
 
 let cachedWeather: WeatherData | null = null;
@@ -230,11 +251,69 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherData> {
   };
 }
 
-async function fetchPollenData(lat: number, lon: number): Promise<PollenData> {
+async function fetchPollenGoogle(lat: number, lon: number, apiKey: string): Promise<PollenData> {
+  const url =
+    `https://pollen.googleapis.com/v1/forecast:lookup` +
+    `?key=${apiKey}&location.latitude=${lat}&location.longitude=${lon}&days=1`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`Google Pollen API ${res.status}`);
+
+  const json = await res.json() as {
+    dailyInfo?: Array<{
+      pollenTypeInfo?: Array<{
+        code: string;
+        indexInfo?: { value?: number; category?: string };
+      }>;
+    }>;
+  };
+
+  const types = json.dailyInfo?.[0]?.pollenTypeInfo ?? [];
+  const find = (code: string): PollenEntry | null => {
+    const t = types.find((p) => p.code === code);
+    if (!t?.indexInfo) return null;
+    return {
+      value: t.indexInfo.value ?? 0,
+      category: t.indexInfo.category ?? "",
+    };
+  };
+
+  // UV still comes from open-meteo (Google Pollen API doesn't provide UV)
+  const uvIndex = await fetchUvIndex(lat, lon);
+
+  return {
+    treePollen: find("TREE"),
+    grassPollen: find("GRASS"),
+    weedPollen: find("WEED"),
+    uvIndex,
+  };
+}
+
+async function fetchUvIndex(lat: number, lon: number): Promise<number | null> {
+  try {
+    const url =
+      `https://air-quality-api.open-meteo.com/v1/air-quality` +
+      `?latitude=${lat}&longitude=${lon}&current=uv_index`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) return null;
+    const json = await res.json() as { current?: { uv_index?: number | null } };
+    const v = json.current?.uv_index;
+    return v != null ? Math.round(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPollenData(lat: number, lon: number, googleApiKey: string | null): Promise<PollenData> {
+  if (googleApiKey) {
+    return fetchPollenGoogle(lat, lon, googleApiKey);
+  }
+
+  // Fallback: open-meteo CAMS
   const url =
     `https://air-quality-api.open-meteo.com/v1/air-quality` +
     `?latitude=${lat}&longitude=${lon}` +
-    `&current=uv_index,alder_pollen,birch_pollen,grass_pollen,olive_pollen`;
+    `&current=uv_index,alder_pollen,birch_pollen,grass_pollen,olive_pollen,mugwort_pollen,ragweed_pollen`;
 
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`Air quality API ${res.status}`);
@@ -246,48 +325,24 @@ async function fetchPollenData(lat: number, lon: number): Promise<PollenData> {
       birch_pollen?: number | null;
       grass_pollen?: number | null;
       olive_pollen?: number | null;
+      mugwort_pollen?: number | null;
+      ragweed_pollen?: number | null;
     };
   };
 
   const c = json.current;
-  const treePollen = Math.max(
-    c.alder_pollen ?? 0,
-    c.birch_pollen ?? 0,
-    c.olive_pollen ?? 0
-  );
-  const grassPollen = c.grass_pollen ?? null;
+  const treeVal = Math.round(Math.max(c.alder_pollen ?? 0, c.birch_pollen ?? 0, c.olive_pollen ?? 0));
+  const weedVal = Math.round(Math.max(c.mugwort_pollen ?? 0, c.ragweed_pollen ?? 0));
+  const grassVal = c.grass_pollen != null ? Math.round(c.grass_pollen) : null;
+
+  const toEntry = (v: number): PollenEntry => ({ value: v, category: "" });
 
   return {
-    treePollen: treePollen > 0 ? treePollen : null,
-    grassPollen,
+    treePollen: toEntry(treeVal),
+    grassPollen: grassVal != null ? toEntry(grassVal) : null,
+    weedPollen: toEntry(weedVal),
     uvIndex: c.uv_index != null ? Math.round(c.uv_index) : null,
   };
-}
-
-// ── Pollen level helpers ─────────────────────────────────────────────────────
-
-function grassPollenLevel(v: number): string {
-  if (v < 10) return "Low";
-  if (v < 50) return "Mod";
-  if (v < 200) return "High";
-  return "V.High";
-}
-
-function treePollenLevel(v: number): string {
-  if (v < 15) return "Low";
-  if (v < 90) return "Mod";
-  return "High";
-}
-
-type PollenLevel = 0 | 1 | 2 | 3;
-
-function pollenLevelRank(label: string): PollenLevel {
-  return (["Low", "Mod", "High", "V.High"].indexOf(label) as PollenLevel) ?? 0;
-}
-
-function dominantPollenCount(pollen: PollenData): number | null {
-  if (pollen.grassPollen == null && pollen.treePollen == null) return null;
-  return Math.round(Math.max(pollen.grassPollen ?? 0, pollen.treePollen ?? 0));
 }
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
@@ -323,12 +378,9 @@ const MAIN_BOT = 268;
 const DIV_Y = MAIN_BOT;
 const HOURLY_TOP = DIV_Y;
 
-// Right panel: icon centred at (595, 175), 156×156
-const ICON_SIZE = 156;
-const ICON_CX = 596;
-const ICON_CY = Math.round((MAIN_TOP + MAIN_BOT) / 2);
-const ICON_X = ICON_CX - ICON_SIZE / 2;
-const ICON_Y = ICON_CY - ICON_SIZE / 2;
+// Right pollen panel: x=428 to x=800, three equal columns
+const POLLEN_SPLIT_X = 428;
+const POLLEN_COL_W = Math.round((W - POLLEN_SPLIT_X) / 3); // 124px each
 
 // Hourly strip
 const COL_W = W / 7;
@@ -338,30 +390,35 @@ const MINI_CY  = HOURLY_TOP + 90;
 const TEMP_Y   = HOURLY_TOP + 158;
 const PRECIP_Y = HOURLY_TOP + 198;
 
+function buildPollenColumn(colIdx: number, label: string, iconSvg: string, entry: PollenEntry | null): string {
+  const cx = POLLEN_SPLIT_X + colIdx * POLLEN_COL_W + Math.round(POLLEN_COL_W / 2);
+  const labelY = MAIN_TOP + 24;
+  const iconCY = MAIN_TOP + 82;
+  const valY   = MAIN_TOP + 142;
+  const unitY  = MAIN_BOT - 12;
+  const valStr = entry != null ? String(entry.value) : "–";
+  const catStr = entry?.category ?? "";
+
+  return `
+    <text x="${cx}" y="${labelY}" text-anchor="middle"
+      font-family="Arial,Helvetica,sans-serif" font-size="22" fill="black">${label}</text>
+    <g transform="translate(${cx},${iconCY}) scale(0.65)">${iconSvg}</g>
+    <text x="${cx}" y="${valY}" text-anchor="middle"
+      font-family="Arial,Helvetica,sans-serif" font-size="48" font-weight="bold" fill="black">${valStr}</text>
+    <text x="${cx}" y="${unitY}" text-anchor="middle"
+      font-family="Arial,Helvetica,sans-serif" font-size="20" fill="black">${escapeXml(catStr)}</text>
+  `;
+}
+
 function buildWeatherSvg(
   data: WeatherData,
   pollen: PollenData | null,
   location: string,
-  mainIconPng: Buffer | null,
   hourlyIconPngs: (Buffer | null)[]
 ): string {
-  const pollenCount = pollen ? dominantPollenCount(pollen) : null;
-  const uvStr = pollen?.uvIndex != null ? String(pollen.uvIndex) : null;
-  const headerRight = pollenCount != null ? `Pollen: ${pollenCount}` : "Pollen: n/a";
-
-  // ── Right-panel stats ───────────────────────────────────────────────────────
-  // \u00a0 = non-breaking space (won't be collapsed by SVG renderer)
-  // \u00b7 = middle dot ·
-  const NBSP = "\u00a0";
-  const SEP  = `\u00a0\u00a0\u00b7\u00a0\u00a0`;
-
-  const rightParts: string[] = [];
-  if (uvStr)      rightParts.push(`UV${NBSP}<tspan font-weight="bold">${escapeXml(uvStr)}</tspan>`);
-
-  const rightStatsSvg = rightParts.length > 0
-    ? `<text x="${ICON_CX}" y="${MAIN_BOT - 14}" text-anchor="middle"
-        font-family="Arial,Helvetica,sans-serif" font-size="22" fill="black">${rightParts.join(SEP)}</text>`
-    : "";
+  const NBSP = " ";
+  const SEP  = `  ·  `;
+  const uvStr = pollen?.uvIndex != null ? `UV${NBSP}${pollen.uvIndex}` : "";
 
   // ── Hourly columns ──────────────────────────────────────────────────────────
   const hourlyItems = data.hourly.slice(0, 7).map((h, i) => {
@@ -393,11 +450,15 @@ function buildWeatherSvg(
       stroke="black" stroke-width="1"/>`
   ).join("");
 
-  // ── Main icon ───────────────────────────────────────────────────────────────
-  const mainIconSvg = embedIcon(mainIconPng, ICON_X, ICON_Y, ICON_SIZE, fallbackIconSvg(data.weatherCode), 0.82);
-
   // ── Temperature hero ─────────────────────────────────────────────────────────
   const tempCY = Math.round((MAIN_TOP + MAIN_BOT) / 2) - 6;
+
+  // ── Pollen columns ──────────────────────────────────────────────────────────
+  const pollenPanel = [
+    buildPollenColumn(0, "Tree",  pollenTreeIconSvg(),  pollen?.treePollen  ?? null),
+    buildPollenColumn(1, "Grass", pollenGrassIconSvg(), pollen?.grassPollen ?? null),
+    buildPollenColumn(2, "Weed",  pollenWeedIconSvg(),  pollen?.weedPollen  ?? null),
+  ].join("");
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${W}" height="${H}" fill="white"/>
@@ -407,10 +468,8 @@ function buildWeatherSvg(
   <text x="44" y="54"
     font-family="Arial,Helvetica,sans-serif"
     font-size="50" font-weight="bold" fill="white">${escapeXml(location)}</text>
-  <text x="${W - 44}" y="54"
-    text-anchor="end"
-    font-family="Arial,Helvetica,sans-serif"
-    font-size="30" fill="white">${escapeXml(headerRight)}</text>
+  ${uvStr ? `<text x="${W - 44}" y="54" text-anchor="end"
+    font-family="Arial,Helvetica,sans-serif" font-size="30" fill="white">${escapeXml(uvStr)}</text>` : ""}
 
   <!-- ── Temperature hero ── -->
   <text x="214" y="${tempCY}"
@@ -422,14 +481,11 @@ function buildWeatherSvg(
   <text x="44" y="${MAIN_BOT - 14}"
     font-family="Arial,Helvetica,sans-serif" font-size="22" fill="black">wind${NBSP}<tspan font-weight="bold">${data.windSpeedMph}${NBSP}mph</tspan>${SEP}hum${NBSP}<tspan font-weight="bold">${data.humidity}%</tspan></text>
 
-  <!-- ── Main weather icon ── -->
-  ${mainIconSvg}
+  <!-- ── Vertical split line ── -->
+  <line x1="${POLLEN_SPLIT_X}" y1="${MAIN_TOP + 16}" x2="${POLLEN_SPLIT_X}" y2="${MAIN_BOT - 16}" stroke="black" stroke-width="1"/>
 
-  <!-- ── Right stats: UV ── -->
-  ${rightStatsSvg}
-
-  <!-- ── Vertical split line (subtle) ── -->
-  <line x1="428" y1="${MAIN_TOP + 16}" x2="428" y2="${MAIN_BOT - 16}" stroke="black" stroke-width="1"/>
+  <!-- ── Pollen columns ── -->
+  ${pollenPanel}
 
   <!-- ── Hourly divider ── -->
   <line x1="0" y1="${DIV_Y}" x2="${W}" y2="${DIV_Y}" stroke="black" stroke-width="2"/>
@@ -446,10 +502,9 @@ function buildWeatherSvg(
 // ── Public render function ───────────────────────────────────────────────────
 
 export async function renderWeatherBmp(config: Config): Promise<Buffer> {
-  // Fetch weather + pollen in parallel; use cache on failure
   const [weatherResult, pollenResult] = await Promise.allSettled([
-    fetchWeather(config.weatherLat, config.weatherLon),
-    fetchPollenData(config.weatherLat, config.weatherLon),
+    fetchWeather(config.weatherLat!, config.weatherLon!),
+    fetchPollenData(config.weatherLat!, config.weatherLon!, config.googlePollenApiKey),
   ]);
 
   if (weatherResult.status === "fulfilled") {
@@ -461,19 +516,16 @@ export async function renderWeatherBmp(config: Config): Promise<Buffer> {
   if (pollenResult.status === "fulfilled") {
     cachedPollen = pollenResult.value;
   }
-  // silently fall through if pollen fails — it's optional
 
   const weather = cachedWeather!;
   const pollen = cachedPollen;
   const day = isDaytime();
 
-  // Fetch all icons in parallel (failures return null → SVG fallback)
-  const [mainIconPng, ...hourlyIconPngs] = await Promise.all([
-    fetchDitheredIcon(weather.weatherCode, ICON_SIZE, day),
-    ...weather.hourly.map((h) => fetchDitheredIcon(h.weatherCode, MINI_SIZE, isDayHour(h.hour))),
-  ]);
+  const hourlyIconPngs = await Promise.all(
+    weather.hourly.map((h) => fetchDitheredIcon(h.weatherCode, MINI_SIZE, isDayHour(h.hour)))
+  );
 
-  const svg = buildWeatherSvg(weather, pollen, config.weatherLocation, mainIconPng ?? null, hourlyIconPngs);
+  const svg = buildWeatherSvg(weather, pollen, config.weatherLocation, hourlyIconPngs);
   return svgToBmp(svg);
 }
 
@@ -481,8 +533,9 @@ export const weatherWidget: WidgetDefinition = {
   name: "weather",
   render: (config) => renderWeatherBmp(config),
   envVars: [
-    { name: "WEATHER_LAT",      description: "Latitude for weather location",       required: false },
-    { name: "WEATHER_LON",      description: "Longitude for weather location",      required: false },
-    { name: "WEATHER_LOCATION", description: "Display name for weather location",   required: false },
+    { name: "WEATHER_LAT",           description: "Latitude (auto-detected if unset)",          required: false },
+    { name: "WEATHER_LON",           description: "Longitude (auto-detected if unset)",         required: false },
+    { name: "WEATHER_LOCATION",      description: "Display name (auto-detected if unset)",      required: false },
+    { name: "GOOGLE_POLLEN_API_KEY", description: "Google Pollen API key (falls back to CAMS)", required: false },
   ],
 };
