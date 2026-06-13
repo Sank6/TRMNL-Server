@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { Config } from "../config.js";
 import type { WidgetDefinition } from "./types.js";
@@ -65,6 +65,7 @@ async function generateWidget(
 }
 
 export async function startWidgets(config: Config): Promise<void> {
+  mkdirSync(config.imageDir, { recursive: true });
   checkEnvVars();
 
   await Promise.all(WIDGETS.map((w) => generateWidget(w, config.imageDir, config)));

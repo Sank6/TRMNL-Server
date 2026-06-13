@@ -1,4 +1,5 @@
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
+import { dirname } from "path";
 
 // TRMNL display: 800x480, 1-bit monochrome BMP
 const width = 800;
@@ -43,5 +44,6 @@ buf.writeUInt32LE(0x00FFFFFF, 58);    // white
 buf.fill(0xff, pixelDataOffset);
 
 const outPath = new URL("../public/images/default.bmp", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
+mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, buf);
 console.log(`Generated default.bmp (${fileSize} bytes)`);
