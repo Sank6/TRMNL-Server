@@ -251,65 +251,20 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherData> {
   };
 }
 
-async function fetchPollenGoogle(lat: number, lon: number, apiKey: string): Promise<PollenData> {
-  const url =
-    `https://pollen.googleapis.com/v1/forecast:lookup` +
-    `?key=${apiKey}&location.latitude=${lat}&location.longitude=${lon}&days=1`;
+// ── Pollen category thresholds (grains/m³) ───────────────────────────────────
+// Standard European / UK Met Office count bands, per pollen type. Used to turn
+// the raw CAMS grain counts into a human label like Google's index category.
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`Google Pollen API ${res.status}`);
-
-  const json = await res.json() as {
-    dailyInfo?: Array<{
-      pollenTypeInfo?: Array<{
-        code: string;
-        indexInfo?: { value?: number; category?: string };
-      }>;
-    }>;
-  };
-
-  const types = json.dailyInfo?.[0]?.pollenTypeInfo ?? [];
-  const find = (code: string): PollenEntry | null => {
-    const t = types.find((p) => p.code === code);
-    if (!t?.indexInfo) return null;
-    return {
-      value: t.indexInfo.value ?? 0,
-      category: t.indexInfo.category ?? "",
-    };
-  };
-
-  // UV still comes from open-meteo (Google Pollen API doesn't provide UV)
-  const uvIndex = await fetchUvIndex(lat, lon);
-
-  return {
-    treePollen: find("TREE"),
-    grassPollen: find("GRASS"),
-    weedPollen: find("WEED"),
-    uvIndex,
-  };
+function categorise(value: number, moderate: number, high: number, veryHigh: number): string {
+  if (value >= veryHigh) return "Very High";
+  if (value >= high) return "High";
+  if (value >= moderate) return "Moderate";
+  if (value > 0) return "Low";
+  return "None";
 }
 
-async function fetchUvIndex(lat: number, lon: number): Promise<number | null> {
-  try {
-    const url =
-      `https://air-quality-api.open-meteo.com/v1/air-quality` +
-      `?latitude=${lat}&longitude=${lon}&current=uv_index`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) return null;
-    const json = await res.json() as { current?: { uv_index?: number | null } };
-    const v = json.current?.uv_index;
-    return v != null ? Math.round(v) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchPollenData(lat: number, lon: number, googleApiKey: string | null): Promise<PollenData> {
-  if (googleApiKey) {
-    return fetchPollenGoogle(lat, lon, googleApiKey);
-  }
-
-  // Fallback: open-meteo CAMS
+// Open-Meteo Air Quality API (CAMS) — free, no key required (Europe coverage).
+async function fetchPollenData(lat: number, lon: number): Promise<PollenData> {
   const url =
     `https://air-quality-api.open-meteo.com/v1/air-quality` +
     `?latitude=${lat}&longitude=${lon}` +
@@ -335,12 +290,11 @@ async function fetchPollenData(lat: number, lon: number, googleApiKey: string | 
   const weedVal = Math.round(Math.max(c.mugwort_pollen ?? 0, c.ragweed_pollen ?? 0));
   const grassVal = c.grass_pollen != null ? Math.round(c.grass_pollen) : null;
 
-  const toEntry = (v: number): PollenEntry => ({ value: v, category: "" });
-
   return {
-    treePollen: toEntry(treeVal),
-    grassPollen: grassVal != null ? toEntry(grassVal) : null,
-    weedPollen: toEntry(weedVal),
+    treePollen: { value: treeVal, category: categorise(treeVal, 10, 50, 500) },
+    grassPollen:
+      grassVal != null ? { value: grassVal, category: categorise(grassVal, 30, 50, 150) } : null,
+    weedPollen: { value: weedVal, category: categorise(weedVal, 10, 50, 500) },
     uvIndex: c.uv_index != null ? Math.round(c.uv_index) : null,
   };
 }
@@ -504,7 +458,7 @@ function buildWeatherSvg(
 export async function renderWeatherBmp(config: Config): Promise<Buffer> {
   const [weatherResult, pollenResult] = await Promise.allSettled([
     fetchWeather(config.weatherLat!, config.weatherLon!),
-    fetchPollenData(config.weatherLat!, config.weatherLon!, config.googlePollenApiKey),
+    fetchPollenData(config.weatherLat!, config.weatherLon!),
   ]);
 
   if (weatherResult.status === "fulfilled") {
@@ -536,6 +490,5 @@ export const weatherWidget: WidgetDefinition = {
     { name: "WEATHER_LAT",           description: "Latitude (auto-detected if unset)",          required: false },
     { name: "WEATHER_LON",           description: "Longitude (auto-detected if unset)",         required: false },
     { name: "WEATHER_LOCATION",      description: "Display name (auto-detected if unset)",      required: false },
-    { name: "GOOGLE_POLLEN_API_KEY", description: "Google Pollen API key (falls back to CAMS)", required: false },
   ],
 };

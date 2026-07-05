@@ -15,7 +15,6 @@ export interface Config {
   weatherLon: number | null;
   weatherLocation: string;
   dashboardPort: number;
-  googlePollenApiKey: string | null;
 }
 
 function parseRequiredPositiveInt(name: string, value: string | undefined): number {
@@ -46,6 +45,5 @@ export function loadConfig(): Config {
     weatherLon: process.env.WEATHER_LON ? parseFloat(process.env.WEATHER_LON) : null,
     weatherLocation: process.env.WEATHER_LOCATION ?? "",
     dashboardPort: parseInt(process.env.DASHBOARD_PORT ?? "3001", 10),
-    googlePollenApiKey: process.env.GOOGLE_POLLEN_API_KEY ?? null,
   };
 }
